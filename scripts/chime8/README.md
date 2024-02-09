@@ -3,14 +3,18 @@
 
 ## Environment Setup
 
-This README outlines the steps to set up your environment for the required operations. Please follow these steps in the order presented to ensure a proper setup.
-This baseline package is based on CUDA 11.8 version. Make sure to install the right version of `torch` that supports the CUDA version you want.
+- This README outlines the steps to set up your environment for the required operations.Please follow these steps in the order presented to ensure a proper setup.
+- Environments:
+    * CUDA 11.8
+    * CMAKE 3.18
+    * python 3.10
+- **NOTE**: Make sure to install the right version of [PyTorch](https://pytorch.org/) that supports the CUDA version you want.
 
 
 ### Prerequisites
 
 - Ensure that you have `git`, `pip`, and `bash` installed on your system.
-- It's assumed that you have CUDA 11.x compatible hardware and drivers installed for `cupy-cuda11x` to work properly.
+- It's assumed that you have CUDA 11.8 compatible hardware and drivers installed for `cupy-cuda11x` to work properly.
 
 ## Package Installation
 
