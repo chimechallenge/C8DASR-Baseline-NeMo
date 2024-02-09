@@ -18,7 +18,7 @@ vad:
     parameters: # Parameters were tuned on 0~20db SNR noisy and clean multilingual ASR data.  
       normalize_audio: False
       window_length_in_sec: 0.63  # window length in sec for VAD context input 
-      shift_length_in_sec: 0.08 # shift length in sec for generate frame level VAD prediction, Here we use 0.08 for faster inferene
+      shift_length_in_sec: 0.02 # shift length in sec for generate frame level VAD prediction, Here we use 0.08 for faster inferene
       smoothing: False # false or type of smoothing method (eg: median, mean)
       overlap: 0.875 # overlap ratio for overlapped mean/median smoothing filter. If smoothing=False, ignore this value.
       postprocessing: 

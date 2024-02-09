@@ -323,7 +323,7 @@ class SDRLoss(Loss, Typing):
             weight = torch.tensor(weight).reshape(1, -1)
             logging.info(f'Channel weight set to %s', weight)
         self.register_buffer('weight', weight)
-        self.weight: Optional[Tensor]
+        self.weight: Optional[torch.Tensor]
 
         # Batch reduction
         self.reduction = reduction

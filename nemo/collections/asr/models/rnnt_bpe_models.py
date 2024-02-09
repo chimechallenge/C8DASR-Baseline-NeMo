@@ -564,6 +564,13 @@ class EncDecRNNTBPEModel(EncDecRNNTModel, ASRBPEMixin):
             manifest_filepath = os.path.join(config['temp_dir'], 'manifest.json')
             batch_size = min(config['batch_size'], len(config['paths2audio_files']))
 
+        if config.get("normalize_db", None) is not None:
+            normalize_db = True
+            normalize_db_target = config["normalize_db"]
+        else:
+            normalize_db = False
+            normalize_db_target = None
+
         dl_config = {
             'manifest_filepath': manifest_filepath,
             'sample_rate': self.preprocessor._sample_rate,
@@ -573,6 +580,8 @@ class EncDecRNNTBPEModel(EncDecRNNTModel, ASRBPEMixin):
             'pin_memory': True,
             'channel_selector': config.get('channel_selector', None),
             'use_start_end_token': self.cfg.validation_ds.get('use_start_end_token', False),
+            'normalize_db': normalize_db,
+            'normalize_db_target': normalize_db_target,
         }
 
         if config.get("augmentor"):

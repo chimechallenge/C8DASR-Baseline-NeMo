@@ -488,12 +488,12 @@ class AudioFeatureIterator(IterableDataset):
         if not self.output:
             raise StopIteration
         last = int(self._start + self._feature_frame_len)
-        if last <= self._features_len[0]:
+        if last <= min(self._features_len[0], self._features.shape[1]):
             frame = self._features[:, self._start : last].cpu()
             self._start = last
         else:
             frame = np.zeros([self._features.shape[0], int(self._feature_frame_len)], dtype='float32')
-            samp_len = self._features_len[0] - self._start
+            samp_len = min(self._features_len[0], self._features.shape[1]) - self._start
             frame[:, 0:samp_len] = self._features[:, self._start : self._features_len[0]].cpu()
             self.output = False
         self.count += 1

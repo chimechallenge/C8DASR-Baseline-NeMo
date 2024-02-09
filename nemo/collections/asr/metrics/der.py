@@ -157,26 +157,36 @@ def score_labels(
     if len(all_reference) == len(all_hypothesis):
         metric = DiarizationErrorRate(collar=2 * collar, skip_overlap=ignore_overlap)
 
-        mapping_dict = {}
+        mapping_dict, correct_spk_count = {}, 0
         for (reference, hypothesis) in zip(all_reference, all_hypothesis):
             ref_key, ref_labels = reference
             _, hyp_labels = hypothesis
+            if len(ref_labels.labels()) == len(hyp_labels.labels()):
+                correct_spk_count += 1
+            if verbose and len(ref_labels.labels()) != len(hyp_labels.labels()):
+                logging.info(f"Wrong Spk. Count with uniq_id:...{ref_key[-10:]}, Ref: {len(ref_labels.labels())}, Hyp: {len(hyp_labels.labels())}")
             uem = AUDIO_RTTM_MAP[ref_key].get('uem_filepath', None)
             if uem is not None:
                 uem = uem_timeline_from_file(uem_file=uem, uniq_name=ref_key)
             metric(ref_labels, hyp_labels, uem=uem, detailed=True)
             mapping_dict[ref_key] = metric.optimal_mapping(ref_labels, hyp_labels)
 
+        spk_count_acc = correct_spk_count / len(all_reference)
         DER = abs(metric)
+        if metric['total'] == 0:
+            raise ValueError(f"Total evaluation time is 0. Abort.")
         CER = metric['confusion'] / metric['total']
         FA = metric['false alarm'] / metric['total']
         MISS = metric['missed detection'] / metric['total']
+        
         itemized_errors = (DER, CER, FA, MISS)
 
+        if verbose:
+            # logging.info(f"\n{metric.report()}")
+            pass
         logging.info(
-            "Cumulative Results for collar {} sec and ignore_overlap {}: \n FA: {:.4f}\t MISS {:.4f}\t \
-                Diarization ER: {:.4f}\t, Confusion ER:{:.4f}".format(
-                collar, ignore_overlap, FA, MISS, DER, CER
+            "Cumulative Results for collar {} sec and ignore_overlap {}: \n| FA: {:.4f} | MISS: {:.4f} | CER: {:.4f} | DER: {:.4f} | Spk. Count Acc. {:.4f}\n".format(
+                collar, ignore_overlap, FA, MISS, CER, DER, spk_count_acc
             )
         )
 

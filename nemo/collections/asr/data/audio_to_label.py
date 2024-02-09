@@ -129,6 +129,7 @@ def _fixed_seq_collate_fn(self, batch):
     fixed_length = int(max(audio_lengths))
 
     audio_signal, tokens, new_audio_lengths = [], [], []
+    max_ch = max([sig.shape[1] for sig, _, _, _ in batch])
     for sig, sig_len, tokens_i, _ in batch:
         if has_audio:
             sig_len = sig_len.item()
@@ -141,7 +142,10 @@ def _fixed_seq_collate_fn(self, batch):
                 rep_sig = torch.cat(repeat * [sig])
                 sig = torch.cat((rep_sig, sub))
             new_audio_lengths.append(torch.tensor(fixed_length))
-
+            # if self.max_ch > 1 and sig.shape[1] < self.max_ch:
+            # if max_ch > 1 and sig.shape[1] < max_ch:
+            #     pad = (0, self.max_ch - sig.shape[1])
+            #     sig = torch.nn.functional.pad(sig, pad)
             audio_signal.append(sig)
 
         tokens.append(tokens_i)
@@ -274,6 +278,8 @@ target_label_n, "offset": offset_in_sec_n}
         trim: bool = False,
         is_regression_task: bool = False,
         cal_labels_occurrence: Optional[bool] = False,
+        channel_selector: Optional[bool] = None,
+        max_ch: int = 1,
     ):
         super().__init__()
         if isinstance(manifest_filepath, str):
@@ -290,6 +296,9 @@ target_label_n, "offset": offset_in_sec_n}
         self.featurizer = featurizer
         self.trim = trim
         self.is_regression_task = is_regression_task
+        self.channel_selector = channel_selector
+        self.max_ch = max_ch
+        print(f"self.max_ch: {self.max_ch} max_ch: {max_ch} is assigned to the dataset loader")
 
         if not is_regression_task:
             self.labels = labels if labels else self.collection.uniq_labels
@@ -323,8 +332,7 @@ target_label_n, "offset": offset_in_sec_n}
 
         if offset is None:
             offset = 0
-
-        features = self.featurizer.process(sample.audio_file, offset=offset, duration=sample.duration, trim=self.trim)
+        features = self.featurizer.process(sample.audio_file, offset=offset, duration=sample.duration, trim=self.trim, channel_selector=self.channel_selector)
         f, fl = features, torch.tensor(features.shape[0]).long()
 
         if not self.is_regression_task:
@@ -417,10 +425,13 @@ class AudioToSpeechLabelDataset(_AudioLabelDataset):
         normalize_audio: bool = False,
         is_regression_task: bool = False,
         cal_labels_occurrence: Optional[bool] = False,
+        channel_selector: Optional[bool] = None,
+        max_ch: Optional[int] = None,
     ):
         self.window_length_in_sec = window_length_in_sec
         self.shift_length_in_sec = shift_length_in_sec
         self.normalize_audio = normalize_audio
+        self.max_ch = max_ch
 
         logging.debug("Window/slice length considered for collate func is {}".format(self.window_length_in_sec))
         logging.debug("Shift length considered for collate func is {}".format(self.shift_length_in_sec))
@@ -434,6 +445,8 @@ class AudioToSpeechLabelDataset(_AudioLabelDataset):
             trim=trim,
             is_regression_task=is_regression_task,
             cal_labels_occurrence=cal_labels_occurrence,
+            channel_selector=channel_selector,
+            max_ch=self.max_ch,
         )
 
     def fixed_seq_collate_fn(self, batch):

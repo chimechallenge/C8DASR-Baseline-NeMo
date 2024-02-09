@@ -204,6 +204,8 @@ class TestPreprocessingUtils:
                     get_full_path(audio_files_relative_path, manifest_file=ais_manifest_file) == audio_files_cache_path
                 )
                 assert get_full_path(audio_files_relative_path, data_dir=ais_data_dir) == audio_files_cache_path
+<<<<<<< HEAD
+=======
 
     @pytest.mark.unit
     def test_get_full_path_audio_file_len_limit(self):
@@ -261,6 +263,9 @@ class TestPreprocessingUtils:
         with pytest.raises(ValueError, match="Parameters manifest_file and data_dir cannot be used simultaneously."):
             # Using a relative path without both manifest_file or data_dir is not allowed
             get_full_path('relative/path', manifest_file='/manifest_dir/file.json', data_dir='/data/dir')
+<<<<<<< HEAD
+>>>>>>> origin
+=======
 
     @pytest.mark.unit
     def test_is_tarred_dataset(self):
@@ -280,3 +285,4 @@ class TestPreprocessingUtils:
 
         # 3) no manifest file, treated as non-tarred dataset
         assert not is_tarred_dataset("_file_1.wav", None)
+>>>>>>> origin

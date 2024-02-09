@@ -358,7 +358,6 @@ def write_transcription(
         return_hypotheses = False
     elif isinstance(transcriptions[0], rnnt_utils.Hypothesis):  # List[rnnt_utils.Hypothesis]
         best_hyps = transcriptions
-        assert cfg.decoding.beam.return_best_hypothesis, "Works only with return_best_hypothesis=true"
     elif isinstance(transcriptions[0], list) and isinstance(
         transcriptions[0][0], rnnt_utils.Hypothesis
     ):  # List[List[rnnt_utils.Hypothesis]] NBestHypothesis
@@ -518,7 +517,7 @@ def transcribe_partial_audio(
                         current_hypotheses[idx].y_sequence = logits[idx][: logits_len[idx]]
                         if current_hypotheses[idx].alignments is None:
                             current_hypotheses[idx].alignments = current_hypotheses[idx].y_sequence
-
+                
                 hypotheses += current_hypotheses
 
             del logits

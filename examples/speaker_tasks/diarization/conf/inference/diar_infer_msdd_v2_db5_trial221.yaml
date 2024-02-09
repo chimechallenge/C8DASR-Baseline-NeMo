@@ -1,0 +1,128 @@
+# This YAML file is created for all types of offline speaker diarization inference tasks in `<NeMo git root>/example/speaker_tasks/diarization` folder.
+# The inference parameters for VAD, speaker embedding extractor, clustering module, MSDD module, ASR decoder are all included in this YAML file. 
+# All the keys under `diarizer` key (`vad`, `speaker_embeddings`, `clustering`, `msdd_model`, `asr`) can be selectively used for its own purpose and also can be ignored if the module is not used.
+# The configurations in this YAML file is suitable for telephone recordings involving 2~8 speakers in a session and may not show the best performance on the other types of acoustic conditions or dialogues.
+# An example line in an input manifest file (`.json` format):
+# {"audio_filepath": "/path/to/audio_file", "offset": 0, "duration": null, "label": "infer", "text": "-", "num_speakers": null, "rttm_filepath": "/path/to/rttm/file", "uem_filepath": "/path/to/uem/file"}
+name: &name "ClusterDiarizer"
+
+num_workers: 1
+sample_rate: 16000
+batch_size: 8
+device: null # can specify a specific device, i.e: cuda:1 (default cuda if cuda available, else cpu)
+verbose: True # enable additional logging
+channel_selector: null
+
+diarizer:
+  use_saved_embeddings: True # True or False
+  manifest_filepath: ???
+  out_dir: ???
+  speaker_out_dir: speaker_outputs
+  oracle_vad: False # If True, uses RTTM files provided in the manifest file to get speech activity (VAD) timestamps
+  collar: 0.25 # Collar value for scoring
+  ignore_overlap: False # Consider or ignore overlap segments while scoring
+  
+  multichannel:
+    parameters:
+      mix_count: 3
+      power_p: 2
+      channel_selector: null
+      multi_channel_mode: 'mc_vad_cc_mixer' # Multichannel model: 'mc_vad', 'mc_vad_cc', 'mc_avg' and 'mc_1st_ch'. Default is "mc_vad"
+      mc_max_vad: False
+      mc_audio_normalize: True
+  vad:
+    model_path: vad_multilingual_marblenet # .nemo local model path or pretrained VAD model name 
+    external_vad_manifest: null # This option is provided to use external vad and provide its speech activity labels for speaker embeddings extraction. Only one of model_path or external_vad_manifest should be set
+
+    parameters: # Tuned parameters for CH109 (using the 11 multi-speaker sessions as dev set) 
+      shift_length_in_sec: 0.02 # Shift length in sec for generate frame level VAD prediction
+      top_k_channels: 5 # If multi-channel audio files are provided, use top-k channels in terms of VAD logit values
+      use_external_vad: True
+      frame_vad_threshold: 0.23
+      window_length_in_sec: 0.02  # Window length in sec for VAD context input 
+      smoothing: "median" # False or type of smoothing method (eg: median)
+      overlap: 0.5 # Overlap ratio for overlapped mean/median smoothing filter
+      onset: 0.3 # Onset threshold for detecting the beginning and end of a speech 
+      offset: 0.3 # Offset threshold for detecting the end of a speech
+      pad_onset: 0.15 # Adding durations before each speech segment 
+      pad_offset: 0.35 # Adding durations after each speech segment 
+      min_duration_on: 0.4 # Threshold for small non_speech deletion
+      min_duration_off: 0.95 # Threshold for short speech segment deletion
+      filter_speech_first: True 
+
+  speaker_embeddings:
+    model_path: titanet_large # .nemo local model path or pretrained model name (titanet_large, ecapa_tdnn or speakerverification_speakernet)
+    parameters:
+      window_length_in_sec: [3.0,1.5,0.5] # Window length(s) in sec (floating-point number). either a number or a list. ex) 1.5 or [1.5,1.0,0.5]
+      shift_length_in_sec: [1.5,0.75,0.25] # Shift length(s) in sec (floating-point number). either a number or a list. ex) 0.75 or [0.75,0.5,0.25]
+      multiscale_weights: [1.7,1.35,1.0]
+      interpolate_scale: 0.1
+      save_embeddings: True # If True, save speaker embeddings in pickle format. This should be True if clustering result is used for other models, such as `msdd_model`.
+  
+  clustering:
+    parameters:
+      oracle_num_speakers: False # If True, use num of speakers value provided in manifest file.
+      max_num_speakers: 4 # Max number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.
+      min_num_speakers: 2 # Max number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.
+      enhanced_count_thres: 80 # If the number of segments is lower than this number, enhanced speaker counting is activated.
+      max_rp_threshold: 0.05
+      sparse_search_volume: 25 # The higher the number, the more values will be examined with more time. 
+      maj_vote_spk_count: False  # If True, take a majority vote on multiple p-values to estimate the number of speakers.
+      clustering_scale_index: 2 # The index of scale to be used for clustering. 
+      sync_score_thres: 0.9 # Cascaed clustering threshold for deciding whether to proceed to the finer scale.
+      max_mc_ch_num: 5
+      
+       
+  msdd_model:
+    model_path: diar_msdd_telephonic # .nemo local model path or pretrained model name for multiscale diarization decoder (MSDD)
+    parameters:
+      use_speaker_model_from_ckpt: True # If True, use speaker embedding model in checkpoint. If False, the provided speaker embedding model in config will be used.
+      infer_batch_size: ${batch_size} # Batch size for MSDD inference. 
+      sigmoid_threshold: [0.85] # Sigmoid threshold for generating binarized speaker labels. The smaller the more generous on detecting overlaps.
+      seq_eval_mode: False # If True, use oracle number of speaker and evaluate F1 score for the given speaker sequences. Default is False.
+      split_infer: True # If True, break the input audio clip to short sequences and calculate cluster average embeddings for inference.
+      diar_window_length: 50 # The length of split short sequence when split_infer is True.
+      global_average_mix_ratio: 0.75
+      global_average_window_count: 25 # The number of windos to calculate global average embedding for both left and right. If 3, 3+3+1 = 7 windows are used.
+      overlap_infer_spk_limit: 0.3 # If the proportion of speaking time is lower than this, ignore those speakers for overlap detection.
+      msdd_overlap_add: False
+      use_1ch_from_ch_clus: False
+      mask_spks_with_clus: True
+      ts_vad_threshold: -1 # if negative number, use VAD for clustering diarizer.
+      infer_overlap: True
+      affinity_weighting: True
+      power_p_aff: 3
+      thres_aff: 0.25
+      use_ts_vad: True
+      multi_ch_late_fusion_mode: True # True or False
+      mc_late_fusion_mode: "post_mean" 
+      infer_mode: "vad_masked_logits_force_1spk_rel_thres"
+      system_name: "sys-B-V07"
+      use_var_weights: False
+  
+  asr:
+    model_path: stt_en_conformer_ctc_large # Provide NGC cloud ASR model name. stt_en_conformer_ctc_* models are recommended for diarization purposes.
+    parameters:
+      asr_based_vad: False # if True, speech segmentation for diarization is based on word-timestamps from ASR inference.
+      asr_based_vad_threshold: 1.0 # Threshold (in sec) that caps the gap between two words when generating VAD timestamps using ASR based VAD.
+      asr_batch_size: null # Batch size can be dependent on each ASR model. Default batch sizes are applied if set to null.
+      decoder_delay_in_sec: null # Native decoder delay. null is recommended to use the default values for each ASR model.
+      word_ts_anchor_offset: null # Offset to set a reference point from the start of the word. Recommended range of values is [-0.05  0.2]. 
+      word_ts_anchor_pos: "start" # Select which part of the word timestamp we want to use. The options are: 'start', 'end', 'mid'.
+      fix_word_ts_with_VAD: False # Fix the word timestamp using VAD output. You must provide a VAD model to use this feature.
+      colored_text: False # If True, use colored text to distinguish speakers in the output transcript.
+      print_time: True # If True, the start and end time of each speaker turn is printed in the output transcript.
+      break_lines: False # If True, the output transcript breaks the line to fix the line width (default is 90 chars)
+    
+    ctc_decoder_parameters: # Optional beam search decoder (pyctcdecode)
+      pretrained_language_model: null # KenLM model file: .arpa model file or .bin binary file.
+      beam_width: 32
+      alpha: 0.5
+      beta: 2.5
+
+    realigning_lm_parameters: # Experimental feature
+      arpa_language_model: null # Provide a KenLM language model in .arpa format.
+      min_number_of_words: 3 # Min number of words for the left context.
+      max_number_of_words: 10 # Max number of words for the right context.
+      logprob_diff_threshold: 1.2  # The threshold for the difference between two log probability values from two hypotheses.
+

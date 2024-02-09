@@ -358,9 +358,15 @@ class AudioSegment(object):
             else:
                 # Check the dimensions match
                 if len(a_samples) != len(samples):
-                    raise RuntimeError(
-                        f'Loaded samples need to have identical length: {a_samples.shape} != {samples.shape}'
-                    )
+
+                    logging.warning(f"Loaded samples for {a_file}, offset {offset}, duration {duration} have different length from previously loaded ones: {a_samples.shape} != {samples.shape}")
+                    logging.warning("Using zero padding !")
+                    maxlen = max(len(a_samples), len(samples))
+                    a_samples = np.pad(a_samples, ((0, maxlen - len(a_samples)), (0, 0)))
+                    samples = np.pad(samples, ((0, maxlen - len(samples)), (0, 0)))
+                    #raise RuntimeError(
+                    #    f'Loaded samples need to have identical length: {a_samples.shape} != {samples.shape}'
+                    #)
 
                 # Concatenate along channel dimension
                 samples = np.concatenate([samples, a_samples], axis=1)

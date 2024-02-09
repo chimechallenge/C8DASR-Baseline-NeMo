@@ -65,6 +65,7 @@ def get_speech_label_dataset(featurizer, config: dict) -> audio_to_label.AudioTo
         shift_length_in_sec=config.get('shift_length_in_sec', 0.01),
         normalize_audio=config.get('normalize_audio', False),
         cal_labels_occurrence=config.get('cal_labels_occurrence', False),
+        channel_selector=config.get('channel_selector', None),
     )
     return dataset
 

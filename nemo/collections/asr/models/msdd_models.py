@@ -1068,7 +1068,12 @@ class NeuralDiarizer(LightningModule):
             org_name = name.replace(prefix, '')
             spk_emb_state_dict[org_name] = model_state_dict[name]
 
-        _speaker_model = EncDecSpeakerLabelModel.from_config_dict(self.msdd_model.cfg.speaker_model_cfg)
+        if self._cfg.device is None:
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        else:
+            device = self._cfg.device
+
+        _speaker_model = EncDecSpeakerLabelModel.from_config_dict(self.msdd_model.cfg.speaker_model_cfg).to(device)
         _speaker_model.load_state_dict(spk_emb_state_dict)
         return _speaker_model
 
@@ -1214,7 +1219,10 @@ class NeuralDiarizer(LightningModule):
                 Length of the sequence determined by `self.diar_window_length` variable.
         """
         emb_vectors_split = torch.zeros_like(emb_vectors)
-        uniq_id = os.path.splitext(os.path.basename(test_data_collection.audio_file))[0]
+        if isinstance(test_data_collection.audio_file, list):
+            uniq_id = test_data_collection.uniq_id
+        else:
+            uniq_id = os.path.splitext(os.path.basename(test_data_collection.audio_file))[0]
         clus_label_tensor = torch.tensor([x[-1] for x in self.msdd_model.clus_test_label_dict[uniq_id]])
         for spk_idx in range(len(test_data_collection.target_spks)):
             stt, end = (

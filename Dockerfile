@@ -176,3 +176,13 @@ RUN if [ "${REQUIRE_AIS_CLI}" = true ]; then \
   exit ${INSTALL_CODE}; \
   else echo "AIS CLI installed successfully"; fi \
   else echo "Skipping AIS CLI installation"; fi
+
+RUN pip uninstall -y 'cupy-cuda12x'
+RUN pip install --no-cache-dir -f https://pip.cupy.dev/pre/ "cupy-cuda12x[all]==13.0.0"
+RUN pip install espnet
+RUN pip install git+http://github.com/desh2608/gss
+RUN pip install optuna
+RUN pip install --upgrade jiwer
+RUN pip install git+https://github.com/kpu/kenlm
+RUN git clone https://github.com/espnet/espnet.git /workspace/espnet
+RUN cd /workspace/nemo/scripts/chime7 && sh install_lm.sh

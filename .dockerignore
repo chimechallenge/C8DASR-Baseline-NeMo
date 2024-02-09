@@ -17,3 +17,11 @@ coverage.xml
 .git
 **/*.nemo
 **/*.ckpt
+
+# chime7
+alignments/
+manifests/
+processed/
+nemo_experiments/
+optuna_output/
+*.db

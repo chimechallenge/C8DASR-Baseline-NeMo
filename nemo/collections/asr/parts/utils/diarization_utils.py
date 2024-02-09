@@ -360,16 +360,26 @@ class OfflineDiarWithASR:
         """
         self.AUDIO_RTTM_MAP = audio_rttm_map(self.manifest_filepath)
         self.audio_file_list = [value['audio_filepath'] for _, value in self.AUDIO_RTTM_MAP.items()]
+        # For multi-channel audio: contains a list of wavfiles with <uniq_id>.wav
+        self.mc_symbolic_audio_file_list = []
 
         self.ctm_file_list = []
-        for k, audio_file_path in enumerate(self.audio_file_list):
-            uniq_id = get_uniqname_from_filepath(audio_file_path)
+        # for k, audio_file_path in enumerate(self.audio_file_list):
+        for uniq_id, manifest_dic in self.AUDIO_RTTM_MAP.items():
+            audio_file_path = manifest_dic['audio_filepath']
+            if isinstance(audio_file_path, str):
+                uniq_id = get_uniqname_from_filepath(audio_file_path)
+            else:
+                dirname = os.path.dirname(audio_file_path[0])
+                self.mc_symbolic_audio_file_list.append(f"{dirname}/{uniq_id}.wav")
+
             if (
                 'ctm_filepath' in self.AUDIO_RTTM_MAP[uniq_id]
                 and self.AUDIO_RTTM_MAP[uniq_id]['ctm_filepath'] is not None
                 and uniq_id in self.AUDIO_RTTM_MAP[uniq_id]['ctm_filepath']
             ):
                 self.ctm_file_list.append(self.AUDIO_RTTM_MAP[uniq_id]['ctm_filepath'])
+
 
         # check if all unique IDs have CTM files
         if len(self.audio_file_list) == len(self.ctm_file_list):
@@ -500,8 +510,13 @@ class OfflineDiarWithASR:
             )
 
         diar_hyp = {}
-        for k, audio_file_path in enumerate(self.audio_file_list):
-            uniq_id = get_uniqname_from_filepath(audio_file_path)
+        # for k, audio_file_path in enumerate(self.audio_file_list):
+        #     uniq_id = get_uniqname_from_filepath(audio_file_path)
+        for uniq_id, manifest_dic in self.AUDIO_RTTM_MAP.items():
+            audio_file_path = manifest_dic['audio_filepath']
+            if isinstance(audio_file_path, str):
+                uniq_id = get_uniqname_from_filepath(audio_file_path)
+
             pred_rttm = os.path.join(self.root_path, 'pred_rttms', uniq_id + '.rttm')
             diar_hyp[uniq_id] = rttm_to_labels(pred_rttm)
         return diar_hyp, score
@@ -571,7 +586,7 @@ class OfflineDiarWithASR:
             ref_labels = rttm_to_labels(ref_rttm)
             ref_n_spk = get_num_of_spk_from_labels(ref_labels)
             est_n_spk = get_num_of_spk_from_labels(pred_labels)
-
+            
             _DER, _CER, _FA, _MISS = (
                 (score['confusion'] + score['false alarm'] + score['missed detection']) / score['total'],
                 score['confusion'] / score['total'],
@@ -732,8 +747,12 @@ class OfflineDiarWithASR:
                 self.realigning_lm = self._load_realigning_LM()
 
         word_dict_seq_list = []
-        for k, audio_file_path in enumerate(self.audio_file_list):
-            uniq_id = get_uniqname_from_filepath(audio_file_path)
+        # for k, audio_file_path in enumerate(self.audio_file_list):
+        #     uniq_id = get_uniqname_from_filepath(audio_file_path)
+        for uniq_id, manifest_dic in self.AUDIO_RTTM_MAP.items():
+            audio_file_path = manifest_dic['audio_filepath']
+            if isinstance(audio_file_path, str):
+                uniq_id = get_uniqname_from_filepath(audio_file_path)
             words, diar_labels = word_hyp[uniq_id], diar_hyp[uniq_id]
             word_ts, word_rfnd_ts = word_ts_hyp[uniq_id], word_ts_refined[uniq_id]
 

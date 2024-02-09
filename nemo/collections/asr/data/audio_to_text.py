@@ -171,6 +171,57 @@ class ASRManifestProcessor:
 
         return t, tl
 
+def expand_audio_filepaths(audio_tar_filepaths, shard_strategy: str, world_size: int, global_rank: int):
+    valid_shard_strategies = ['scatter', 'replicate']
+    if shard_strategy not in valid_shard_strategies:
+        raise ValueError(f"`shard_strategy` must be one of {valid_shard_strategies}")
+
+    if isinstance(audio_tar_filepaths, str):
+        # Replace '(' and '[' with '{'
+        brace_keys_open = ['(', '[', '<', '_OP_']
+        for bkey in brace_keys_open:
+            if bkey in audio_tar_filepaths:
+                audio_tar_filepaths = audio_tar_filepaths.replace(bkey, "{")
+
+        # Replace ')' and ']' with '}'
+        brace_keys_close = [')', ']', '>', '_CL_']
+        for bkey in brace_keys_close:
+            if bkey in audio_tar_filepaths:
+                audio_tar_filepaths = audio_tar_filepaths.replace(bkey, "}")
+
+    if isinstance(audio_tar_filepaths, str):
+        # Brace expand
+        audio_tar_filepaths = list(braceexpand.braceexpand(audio_tar_filepaths))
+
+    # Expand store paths into WebDataset URLs
+    audio_tar_filepaths = [
+        datastore_path_to_webdataset_url(p) if is_datastore_path(p) else p for p in audio_tar_filepaths
+    ]
+
+    # Check for distributed and partition shards accordingly
+    if world_size > 1:
+        if shard_strategy == 'scatter':
+            logging.info("All tarred dataset shards will be scattered evenly across all nodes.")
+
+            if len(audio_tar_filepaths) % world_size != 0:
+                logging.warning(
+                    f"Number of shards in tarred dataset ({len(audio_tar_filepaths)}) is not divisible "
+                    f"by number of distributed workers ({world_size})."
+                )
+
+            begin_idx = (len(audio_tar_filepaths) // world_size) * global_rank
+            end_idx = begin_idx + len(audio_tar_filepaths) // world_size
+            audio_tar_filepaths = audio_tar_filepaths[begin_idx:end_idx]
+            logging.info(
+                "Partitioning tarred dataset: process (%d) taking shards [%d, %d)", global_rank, begin_idx, end_idx
+            )
+
+        elif shard_strategy == 'replicate':
+            logging.info("All tarred dataset shards will be replicated across all nodes.")
+        else:
+            raise ValueError(f"Invalid shard strategy ! Allowed values are : {valid_shard_strategies}")
+
+    return audio_tar_filepaths
 
 def expand_sharded_filepaths(sharded_filepaths, shard_strategy: str, world_size: int, global_rank: int):
     valid_shard_strategies = ['scatter', 'replicate']
@@ -442,6 +493,8 @@ class _AudioTextDataset(Dataset):
         pad_id: int = 0,
         return_sample_id: bool = False,
         channel_selector: Optional[ChannelSelectorType] = None,
+        normalize_db: Optional[bool] = False,
+        normalize_db_target: Optional[float] = -25.0,
     ):
         if type(manifest_filepath) == str:
             manifest_filepath = manifest_filepath.split(",")
@@ -463,6 +516,8 @@ class _AudioTextDataset(Dataset):
         self.trim = trim
         self.return_sample_id = return_sample_id
         self.channel_selector = channel_selector
+        self.normalize_db = normalize_db
+        self.normalize_db_target = normalize_db_target
 
     def get_manifest_sample(self, sample_id):
         return self.manifest_processor.collection[sample_id]
@@ -481,6 +536,7 @@ class _AudioTextDataset(Dataset):
             trim=self.trim,
             orig_sr=sample.orig_sr,
             channel_selector=self.channel_selector,
+            normalize_db=self.normalize_db_target,
         )
         f, fl = features, torch.tensor(features.shape[0]).long()
 
@@ -653,7 +709,10 @@ class AudioToBPEDataset(_AudioTextDataset):
         use_start_end_token: bool = True,
         return_sample_id: bool = False,
         channel_selector: Optional[ChannelSelectorType] = None,
+        normalize_db: Optional[bool] = False,
+        normalize_db_target: Optional[float] = -25.0,
     ):
+        
         if use_start_end_token and hasattr(tokenizer, "bos_id") and tokenizer.bos_id > 0:
             bos_id = tokenizer.bos_id
         else:
@@ -702,6 +761,8 @@ class AudioToBPEDataset(_AudioTextDataset):
             trim=trim,
             return_sample_id=return_sample_id,
             channel_selector=channel_selector,
+            normalize_db=normalize_db,
+            normalize_db_target=normalize_db_target,
         )
 
 

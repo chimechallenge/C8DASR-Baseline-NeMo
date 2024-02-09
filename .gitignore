@@ -14,11 +14,21 @@ fastspeech_output
 .hydra
 .bash_history.local
 
+# chime7
+alignments/
+processed/
+*_heh*
+optuna_output*
+decoders/
+optuna_asr_lm/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 **.pyc
+*.db
 
 # C extensions
 *.so
@@ -72,6 +82,9 @@ coverage.xml
 # Translations
 *.mo
 *.pot
+*.json
+debug*
+manifests_*/
 
 # Django stuff:
 *.log
@@ -178,4 +191,9 @@ examples/neural_graphs/*.yml
 
 .hydra/
 nemo_experiments/
+
+*.nemo
+
+scripts/chime7/text/
+scripts/chime7/boost_*
 

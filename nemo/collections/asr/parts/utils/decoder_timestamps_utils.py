@@ -14,7 +14,7 @@
 
 import copy
 import math
-from typing import Dict, List, Tuple, Type, Union
+from typing import Dict, List, Tuple, Type, Union, Optional
 
 import numpy as np
 import torch
@@ -33,6 +33,7 @@ from nemo.collections.asr.parts.utils.audio_utils import get_samples
 from nemo.collections.asr.parts.utils.speaker_utils import audio_rttm_map, get_uniqname_from_filepath
 from nemo.collections.asr.parts.utils.streaming_utils import AudioFeatureIterator, FrameBatchASR
 from nemo.collections.common.tokenizers.tokenizer_spec import TokenizerSpec
+from nemo.collections.asr.parts.preprocessing.segment import AudioSegment
 from nemo.utils import logging
 
 __all__ = ['ASRDecoderTimeStamps']
@@ -57,7 +58,6 @@ class WERBPE_TS(WER):
     This class is designed to support ASR models based on CTC and BPE.
     Please refer to the definition of WERBPE class for more information.
     """
-
     def __init__(
         self,
         tokenizer: TokenizerSpec,
@@ -226,13 +226,15 @@ class WER_TS(WER):
         return hypotheses, timestamps
 
 
-def get_wer_feat_logit(audio_file_path, asr, frame_len, tokens_per_chunk, delay, model_stride_in_secs):
+# def get_wer_feat_logit(audio_file_path, asr, frame_len, tokens_per_chunk, delay, model_stride_in_secs, channel_selector=None):
+def get_wer_feat_logit(manifest_dic, asr, frame_len, tokens_per_chunk, delay, model_stride_in_secs, channel_selector=None):
     """
     Create a preprocessor to convert audio samples into raw features,
     Normalization will be done per buffer in frame_bufferer.
     """
     asr.reset()
-    asr.read_audio_file_and_return(audio_file_path, delay, model_stride_in_secs)
+    # asr.read_audio_file_and_return(audio_file_path, delay, model_stride_in_secs, channel_selector=channel_selector)
+    asr.read_audio_file_and_return(manifest_dic, delay, model_stride_in_secs, channel_selector=channel_selector)
     hyp, tokens, log_prob = asr.transcribe_with_ts(tokens_per_chunk, delay)
     return hyp, tokens, log_prob
 
@@ -258,8 +260,15 @@ class FrameBatchASRLogits(FrameBatchASR):
         self.all_logprobs = []
         self.all_preds = []
 
-    def read_audio_file_and_return(self, audio_filepath: str, delay: float, model_stride_in_secs: float):
-        samples = get_samples(audio_filepath)
+    # def read_audio_file_and_return(self, audio_filepath: str, delay: float, model_stride_in_secs: float, channel_selector: Optional[bool] = None):
+    def read_audio_file_and_return(self, manifest_dic: dict, delay: float, model_stride_in_secs: float, channel_selector: Optional[bool] = None):
+        # _samples = get_samples(audio_filepath[0])
+        import time; stt = time.time()
+        samples = AudioSegment.from_file(audio_file=manifest_dic['audio_filepath'],
+                                         offset=manifest_dic['offset'],
+                                         duration=manifest_dic['duration'],
+                                         channel_selector=channel_selector).samples
+        print(f'======== AudioSegment MC loading time : {time.time() - stt}')
         samples = np.pad(samples, (0, int(delay * model_stride_in_secs * self.asr_model._cfg.sample_rate)))
         frame_reader = AudioFeatureIterator(samples, self.frame_len, self.raw_preprocessor, self.asr_model.device)
         self.set_frame_reader(frame_reader)
@@ -320,6 +329,7 @@ class ASRDecoderTimeStamps:
         self.encdec_class = None
         self.AUDIO_RTTM_MAP = audio_rttm_map(self.manifest_filepath)
         self.audio_file_list = [value['audio_filepath'] for _, value in self.AUDIO_RTTM_MAP.items()]
+        self.channel_selector = cfg_diarizer.channel_selector
 
     def set_asr_model(self):
         """
@@ -658,19 +668,25 @@ class ASRDecoderTimeStamps:
 
         with torch.cuda.amp.autocast():
             logging.info(f"Running ASR model {self.ASR_model_name}")
-
-            for idx, audio_file_path in enumerate(self.audio_file_list):
-                uniq_id = get_uniqname_from_filepath(audio_file_path)
-                logging.info(f"[{idx+1}/{len(self.audio_file_list)}] FrameBatchASR: {audio_file_path}")
+            # for idx, audio_file_path in enumerate(self.audio_file_list):
+            for idx, (uniq_id, manifest_dic) in enumerate(self.AUDIO_RTTM_MAP.items()):
+                audio_file_path = manifest_dic["audio_filepath"]
+                if isinstance(audio_file_path, str):
+                    uniq_id = get_uniqname_from_filepath(audio_file_path)
+                
+                # logging.info(f"[{idx+1}/{len(self.audio_file_list)}] FrameBatchASR: {audio_file_path}")
+                logging.info(f"[{idx+1}/{len(self.AUDIO_RTTM_MAP)}] FrameBatchASR: {audio_file_path}")
                 frame_asr.clear_buffer()
 
                 hyp, greedy_predictions_list, log_prob = get_wer_feat_logit(
-                    audio_file_path,
+                    # audio_file_path,
+                    manifest_dic,
                     frame_asr,
                     self.chunk_len_in_sec,
                     tokens_per_chunk,
                     mid_delay,
                     self.model_stride_in_secs,
+                    channel_selector=self.channel_selector,
                 )
                 if self.beam_search_decoder:
                     logging.info(

@@ -223,6 +223,7 @@ def get_bpe_dataset(
     Returns:
         An instance of AudioToBPEDataset.
     """
+
     dataset = audio_to_text.AudioToBPEDataset(
         manifest_filepath=config['manifest_filepath'],
         tokenizer=tokenizer,
@@ -236,6 +237,8 @@ def get_bpe_dataset(
         use_start_end_token=config.get('use_start_end_token', True),
         return_sample_id=config.get('return_sample_id', False),
         channel_selector=config.get('channel_selector', None),
+        normalize_db=config.get('normalize_db', False),
+        normalize_db_target=config.get('normalize_db_target', -25.0),
     )
     return dataset
 

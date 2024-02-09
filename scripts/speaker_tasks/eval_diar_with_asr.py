@@ -17,10 +17,13 @@ import argparse
 import json
 import os
 
-from nemo.collections.asr.metrics.der import evaluate_der
+from nemo.collections.asr.metrics.der import evaluate_der, get_partial_ref_labels
 from nemo.collections.asr.parts.utils.diarization_utils import OfflineDiarWithASR
 from nemo.collections.asr.parts.utils.manifest_utils import read_file
+from nemo.utils import logging
 from nemo.collections.asr.parts.utils.speaker_utils import (
+    audio_rttm_map,
+    labels_to_rttmfile,
     get_uniqname_from_filepath,
     labels_to_pyannote_object,
     rttm_to_labels,
@@ -79,7 +82,7 @@ python eval_diar_with_asr.py \
 """
 
 
-def get_pyannote_objs_from_rttms(rttm_file_path_list):
+def get_pyannote_objs_from_rttms(rttm_file_path_list: list, partial_rttm_list: list = None):
     """Generate PyAnnote objects from RTTM file list
     """
     pyannote_obj_list = []
@@ -92,6 +95,64 @@ def get_pyannote_objs_from_rttms(rttm_file_path_list):
             pyannote_obj_list.append([uniq_id, reference])
     return pyannote_obj_list
 
+def get_pyannote_objs_from_truncated_rttms(
+    hyp_rttm_file_path_list: list, 
+    ref_rttm_file_path_list: list, 
+    only_eval_hyp_intervals: bool = False,
+    audio_rttm_map_dict: dict = None,
+    ):
+    """
+    Generate PyAnnote objects from RTTM file list
+    If only_eval_hyp_intervals is True, then only the intervals in the hypothesis RTTM file are evaluated.
+
+    Args:
+        hyp_rttm_file_path_list (list): list of hypothesis RTTM file paths
+        ref_rttm_file_path_list (list): list of reference RTTM file paths
+        only_eval_hyp_intervals (bool): if True, only the intervals in the hypothesis RTTM file are evaluated
+
+    Returns:
+        pyannote_obj_ref_list (list): list of reference PyAnnote objects
+        pyannote_obj_hyp_list (list): list of hypothesis PyAnnote objects
+    """
+    pyannote_obj_hyp_list, pyannote_obj_ref_list = [], []
+    for hyp_rttm_file, ref_rttm_file in zip(hyp_rttm_file_path_list, ref_rttm_file_path_list):
+        hyp_rttm_file, ref_rttm_file = hyp_rttm_file.strip(), ref_rttm_file.strip()
+        if ref_rttm_file is not None and os.path.exists(ref_rttm_file):
+            uniq_id_hyp = get_uniqname_from_filepath(hyp_rttm_file)
+            uniq_id_ref = get_uniqname_from_filepath(ref_rttm_file)
+            if uniq_id_hyp != uniq_id_ref:
+                raise ValueError(f"Uniq ID mismatch between hyp and ref RTTM files: {uniq_id_hyp} != {uniq_id_ref}")
+            ref_labels, hyp_labels = rttm_to_labels(ref_rttm_file), rttm_to_labels(hyp_rttm_file)
+            if only_eval_hyp_intervals:
+                ref_labels = get_partial_ref_labels(pred_labels=hyp_labels, ref_labels=ref_labels)
+                partial_rttm_path = f"{os.path.dirname(hyp_rttm_file)}/partial_rttm"
+                if not os.path.exists(partial_rttm_path):
+                    os.makedirs(partial_rttm_path)
+                labels_to_rttmfile(labels=ref_labels, uniq_id=uniq_id_ref, out_rttm_dir=partial_rttm_path)
+                audio_rttm_map_dict[uniq_id_ref]['rttm_filepath']= f"{partial_rttm_path}/{uniq_id_ref}.rttm"
+            ### Eval TEST
+            # all_dur = []
+            # for label in hyp_labels:
+            #     split_label = label.split()
+            #     dur = float(split_label[1]) - float(split_label[0])
+            #     all_dur.append(dur)
+            # all_ref_dur = float(ref_labels[-1].split()[1]) - float(ref_labels[0].split()[0])
+            # print(f"Total hyp duration: {sum(all_dur)}")
+            # print(f"Total ref duration: {all_ref_dur}")
+            # print(f"Total hyp duration / Total ref duration: {sum(all_dur) / all_ref_dur}")
+            # hyp_labels = [" ".join([ref_labels[0].split()[0], ref_labels[-1].split()[1], "speaker_vad"])]
+            # hyp_labels = []
+            # for label in ref_labels:
+            #     split_label = label.split()
+            #     hyp_label = " ".join(split_label[:2] + ['spkeaer_vad'])
+            #     hyp_labels.append(hyp_label)
+            # labels_to_rttmfile(labels=hyp_labels, uniq_id=uniq_id_hyp, out_rttm_dir=os.path.dirname(hyp_rttm_file))
+            ###
+            reference = labels_to_pyannote_object(ref_labels, uniq_name=uniq_id_ref)
+            hypothesis = labels_to_pyannote_object(hyp_labels, uniq_name=uniq_id_ref)
+            pyannote_obj_hyp_list.append([uniq_id_hyp, reference])
+            pyannote_obj_ref_list.append([uniq_id_ref, hypothesis])
+    return pyannote_obj_hyp_list, pyannote_obj_ref_list, audio_rttm_map_dict
 
 def make_meta_dict(hyp_rttm_list, ref_rttm_list):
     """Create a temporary `audio_rttm_map_dict` for evaluation
@@ -131,9 +192,10 @@ def main(
     hyp_ctm_list_path: str,
     ref_ctm_list_path: str,
     hyp_json_list_path: str,
+    only_eval_hyp_intervals: bool = False,
     diar_eval_mode: str = "all",
     root_path: str = "./",
-):
+    ):
 
     # Read filepath list files
     hyp_rttm_list = read_file_path(hyp_rttm_list_path) if hyp_rttm_list_path else None
@@ -143,11 +205,17 @@ def main(
     hyp_json_list = read_file_path(hyp_json_list_path) if hyp_json_list_path else None
 
     audio_rttm_map_dict = make_meta_dict(hyp_rttm_list, ref_rttm_list)
-
     trans_info_dict = make_trans_info_dict(hyp_json_list) if hyp_json_list else None
 
-    all_hypothesis = get_pyannote_objs_from_rttms(hyp_rttm_list)
-    all_reference = get_pyannote_objs_from_rttms(ref_rttm_list)
+    # if only_eval_hyp_intervals:
+    all_hypothesis, all_reference, audio_rttm_map_dict = get_pyannote_objs_from_truncated_rttms(hyp_rttm_list, 
+                                                                                                ref_rttm_list, 
+                                                                                                only_eval_hyp_intervals=only_eval_hyp_intervals, 
+                                                                                                audio_rttm_map_dict=audio_rttm_map_dict
+                                                                                                )
+    # else:
+    #     all_hypothesis = get_pyannote_objs_from_rttms(hyp_rttm_list)
+    #     all_reference = get_pyannote_objs_from_rttms(ref_rttm_list)
 
     diar_score = evaluate_der(
         audio_rttm_map_dict=audio_rttm_map_dict,
@@ -189,6 +257,7 @@ def main(
     OfflineDiarWithASR.print_errors(der_results=der_results, wer_results=wer_results)
 
     # Save detailed session-level evaluation results in `root_path`.
+    logging.info(f"The only_eval_hyp_intervals={only_eval_hyp_intervals} and diar_eval_mode={diar_eval_mode}.")
     OfflineDiarWithASR.write_session_level_result_in_csv(
         der_results=der_results,
         wer_results=wer_results,
@@ -211,6 +280,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--ref_ctm_list", help="path to the filelist of reference CTM files", type=str, required=False, default=None
+    )
+    parser.add_argument(
+        "--only_eval_hyp_intervals", help="limit the target evaluation interval to hypothesis", type=bool, required=False, default=False
     )
     parser.add_argument(
         "--hyp_json_list",
@@ -238,6 +310,7 @@ if __name__ == "__main__":
         args.hyp_ctm_list,
         args.ref_ctm_list,
         args.hyp_json_list,
+        args.only_eval_hyp_intervals,
         args.diar_eval_mode,
         args.root_path,
     )

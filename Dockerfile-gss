@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:experimental
+
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# First build the base image `nemo-chime7` usng the Dockerfile under nemo root
+ARG BASE_IMAGE=nemo-chime7
+
+# build an image that includes only the nemo dependencies, ensures that dependencies
+# are included first for optimal caching, and useful for building a development
+# image (by specifying build target as `nemo-deps`)
+FROM ${BASE_IMAGE} as nemo-deps
+
+# copy scripts/examples/tests into container for end user
+WORKDIR /workspace/nemo
+
+RUN pip uninstall -y 'cupy-cuda118'
+RUN pip install --no-cache-dir -f https://pip.cupy.dev/pre/ "cupy-cuda11x[all]==12.1.0"
+RUN pip install git+http://github.com/desh2608/gss
+RUN pip install optuna
+RUN pip install lhotse==1.14.0
+RUN pip install --upgrade jiwer
+
+WORKDIR /workspace/nemo
+COPY nemo /workspace/nemo/nemo
+COPY examples /workspace/nemo/examples
+COPY scripts /workspace/nemo/scripts

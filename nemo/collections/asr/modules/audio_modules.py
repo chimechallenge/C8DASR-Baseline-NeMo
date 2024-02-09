@@ -969,6 +969,210 @@ class MaskEstimatorGSS(NeuralModule):
 
         return gamma
 
+#FIXME DUPLICATED
+class MaskEstimatorGSS(torch.nn.Module):
+    """Estimate masks using guided source separation with a complex
+    angular Central Gaussian Mixture Model (cACGMM).
+
+    Notation is approximately following [1], where `gamma` denotes
+    the time-frequency mask, `alpha` denotes the mixture weights,
+    and `BM` denotes the shape matrix. Additionally, provided
+    source activity is denoted as `activity`.
+
+    Args:
+        num_iterations: Number of iterations for the EM algorithm
+        eps: Small value for regularization
+        dtype: Data type for internal computations
+
+
+    References:
+        [1] Ito et al., Complex Angular Central Gaussian Mixture Model for Directional Statistics in Mask-Based Microphone Array Signal Processing, 2016
+        [2] Boeddeker et al., Front-End Processing for the CHiME-5 Dinner Party Scenario, 2018
+    """
+
+    def __init__(self, num_iterations: int = 3, eps=1e-8, dtype: torch.dtype = torch.cdouble):
+        super().__init__()
+
+        self.num_iterations = num_iterations
+        self.eps = eps
+        # Internal calculations
+        assert dtype in [torch.cfloat, torch.cdouble], f'Unsupported dtype {dtype}, expecting cfloat or cdouble'
+        self.dtype = dtype
+
+        logging.debug('Initialized %s', self.__class__.__name__)
+        logging.debug('\tnum_iterations: %s', self.num_iterations)
+        logging.debug('\teps:            %g', self.eps)
+        logging.debug('\tdtype:          %s', self.dtype)
+
+    def normalize(self, x: torch.Tensor, dim=-3) -> torch.Tensor:
+        """Normalize input to have a unit L2-norm across `dim`.
+        By default, normalizes across the input channels.
+
+        Args:
+            x: C-channel input signal, shape (B, C, F, T)
+            dim: Dimension for normalization, defaults to -3 to normalize over channels
+
+        Returns:
+            Normalized signal, shape (B, C, F, T)
+        """
+        norm_x = torch.linalg.vector_norm(x, ord=2, dim=dim, keepdim=True)
+        x = x / (norm_x + self.eps)
+        return x
+
+    def update_masks(self, alpha: torch.Tensor, activity, log_pdf):
+        """Update masks for the cACGMM.
+
+        Args:
+            alpha: component weights, shape (B, num_outputs, F)
+            activity: temporal activity for the components, shape (B, num_outputs, T)
+            log_pdf: logarithm of the PDF, shape (B, num_outputs, F, T)
+
+        Returns:
+            Masks for the components of the model, shape (B, num_outputs, F, T)
+        """
+        num_inputs = log_pdf.size(-1)
+
+        # (B, num_outputs, F)
+        # normalize across outputs in the log domain
+        gamma = log_pdf - torch.max(log_pdf, axis=-3, keepdim=True)[0]
+
+        gamma = torch.exp(gamma)
+
+        # calculate the mask using weight, pdf and source activity
+        gamma = alpha[..., None] * gamma * activity[..., None, :]
+
+        # normalize across components/output channels
+        gamma = gamma / (torch.sum(gamma, dim=-3, keepdim=True) + self.eps)
+
+        return gamma
+
+    def update_weights(self, gamma):
+        """Update weights for the individual components
+        in the mixture model.
+
+        Args:
+            gamma: masks, shape (B, num_outputs, F, T)
+
+        Returns:
+            Component weights, shape (B, num_outputs, F)
+        """
+        alpha = torch.mean(gamma, dim=-1)
+        return alpha
+
+    def update_pdf(
+        self, z: torch.Tensor, gamma: torch.Tensor, zH_invBM_z: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Update PDF of the cACGMM.
+
+        Args:
+            z: directional statistics, shape (B, num_inputs, F, T)
+            gamma: masks, shape (B, num_outputs, F, T)
+            zH_invBM_z: energy weighted by shape matrices, shape (B, num_outputs, F, T)
+
+        Returns:
+            Logarithm of the PDF, shape (B, num_outputs, F, T), the energy term, shape (B, num_outputs, F, T)
+        """
+        num_inputs = z.size(-3)
+
+        # shape (B, num_outputs, F, T)
+        scale = gamma / (zH_invBM_z + self.eps)
+
+        # scale outer product and sum over time
+        # shape (B, num_outputs, F, num_inputs, num_inputs)
+        BM = num_inputs * torch.einsum('bmft,bift,bjft->bmfij', scale.to(z.dtype), z, z.conj())
+
+        # normalize across time
+        denom = torch.sum(gamma, dim=-1)
+        BM = BM / (denom[..., None, None] + self.eps)
+
+        # make sure the matrix is Hermitian
+        BM = (BM + BM.conj().transpose(-1, -2)) / 2
+
+        # use eigenvalue decomposition to calculate the log determinant
+        # --
+        # and the inverse-weighted energy term
+        L, Q = torch.linalg.eigh(BM)
+
+        # BM is positive definite, so all eigenvalues should be positive
+        # However, small negative values may occur due to a limited precision
+        L = torch.clamp(L.real, min=self.eps)
+
+        # PDF is invariant to scaling of the shape matrix [1], so
+        # eignevalues can be normalized (across num_inputs)
+        L = L / (torch.max(L, axis=-1, keepdim=True)[0] + self.eps)
+
+        # small regularization to avoid numerical issues
+        L = L + self.eps
+
+        # calculate the log determinant using the eigenvalues
+        log_detBM = torch.sum(torch.log(L), dim=-1)
+
+        # calculate the energy term using the inverse eigenvalues
+        # --
+        # zH_invBM_z = torch.einsum('bift,bmfij,bmfj,bmfkj,bkft->bmft', z.conj(), Q, (1 / L).to(Q.dtype), Q.conj(), z)
+        # # small regularization
+        # zH_invBM_z = zH_invBM_z.abs() + self.eps
+
+        # calc sqrt(L) * Q^H * z
+        zH_invBM_z = torch.einsum('bmfj,bmfkj,bkft->bmftj', (1 / L.sqrt()).to(Q.dtype), Q.conj(), z)
+        # calc squared norm
+        zH_invBM_z = zH_invBM_z.abs().pow(2).sum(-1)
+        # small regularization
+        zH_invBM_z = zH_invBM_z + self.eps
+
+        # final log PDF
+        # --
+        log_pdf = -num_inputs * torch.log(zH_invBM_z) - log_detBM[..., None]
+
+        return log_pdf, zH_invBM_z
+
+    def forward(self, input: torch.Tensor, activity: torch.Tensor) -> torch.Tensor:
+        """Apply GSS to estimate the masks.
+
+        Args:
+            input: batched C-channel input signal, shape (B, num_inputs, F, T)
+            activity: batched frame-wise activity for each output/component, shape (B, num_outputs, T)
+
+        Returns:
+            Masks for the components of the model, shape (B, num_outputs, F, T)
+        """
+        B, num_inputs, F, T = input.shape
+        num_outputs = activity.size(1)
+        assert (
+            activity.size(0) == B and activity.size(-1) == T
+        ), f'Expecting activity of shape ({B}, num_outputs, {T}), got {activity.shape}'
+        assert num_outputs > 1, f'Expecting multiple outputs, got {num_outputs}'
+
+        with torch.cuda.amp.autocast(enabled=False):
+            input = input.to(dtype=self.dtype)
+
+            assert input.is_complex(), f'Expecting complex input, got {input.dtype}'
+
+            # convert input to directional statistics
+            # by normalizing across channels
+            z = self.normalize(input, dim=-3)
+
+            # initialize masks
+            gamma = torch.clamp(activity, min=self.eps)
+            # normalize across channels
+            gamma = gamma / torch.sum(gamma, dim=-2, keepdim=True)
+            # expand to input shape
+            gamma = gamma.unsqueeze(2).expand(-1, -1, F, -1)
+
+            # initialize energy term
+            zH_invBM_z = torch.ones(B, num_outputs, F, T, dtype=input.dtype, device=input.device)
+
+            # EM iterations
+            for it in range(self.num_iterations):
+                alpha = self.update_weights(gamma)
+                log_pdf, zH_invBM_z = self.update_pdf(z, gamma, zH_invBM_z)
+                gamma = self.update_masks(alpha, activity, log_pdf)
+
+        if torch.any(torch.isnan(gamma)):
+            raise RuntimeError(f'gamma contains NaNs: {gamma}')
+
+        return gamma
+
 
 class MaskReferenceChannel(NeuralModule):
     """A simple mask processor which applies mask
@@ -1464,7 +1668,19 @@ class WPEFilter(NeuralModule):
             Q = Q + torch.diag_embed(diag_reg.unsqueeze(-1) * torch.ones(Q.shape[-1], device=Q.device))
 
         # Solve for the filter
-        G = torch.linalg.solve(Q, R)
+        fail = False
+        try:
+            # Use Cholesky decomposition
+            QL = torch.linalg.cholesky(Q)
+            # Forward and backward substitution
+            G = torch.linalg.solve_triangular(QL, R, upper=False)
+            G = torch.linalg.solve_triangular(QL.conj().transpose(-2, -1), G, upper=True)
+        except torch.linalg.LinAlgError as e:
+            fail = True
+
+        if fail:
+            logging.warning('Cholesky failed, fallback to linsolve')
+            G = torch.linalg.solve(Q, R)
 
         # Reshape to desired representation: (B, F, input channels, filter_length, output channels)
         G = G.reshape(B, F, C, filter_length, C)

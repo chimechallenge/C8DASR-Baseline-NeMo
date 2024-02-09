@@ -132,7 +132,6 @@ class EncDecSpeakerLabelModel(ModelPT, ExportableEncDecModel):
 
         if 'loss' in cfg:
             cfg_eval_loss = copy.deepcopy(cfg.loss)
-
             if 'angular' in cfg.loss._target_:
                 OmegaConf.set_struct(cfg, True)
                 with open_dict(cfg):
