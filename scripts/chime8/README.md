@@ -5,9 +5,9 @@
 
 - This README outlines the steps to set up your environment for the required operations.Please follow these steps in the order presented to ensure a proper setup.
 - Environments:
-    * CUDA 11.8
-    * CMAKE 3.18
-    * python 3.10
+    * [CUDA 11.8](https://developer.nvidia.com/cuda-11-8-0-download-archive)
+    * [CMAKE 3.18](https://cmake.org/)
+    * [python 3.10](https://www.python.org/downloads/release/python-3100/)
 - **NOTE**: Make sure to install the right version of [PyTorch](https://pytorch.org/) that supports the CUDA version you want.
 
 
@@ -33,7 +33,7 @@ pip install optuna-dashboard
 pip install lhotse==1.14.0
 pip install --upgrade jiwer
 pip install cmake>=3.18
-./run_install_lm.sh "/your/path/to/NeMo"
+./run_install_lm.sh "/your/path/to/C8DASR_NeMo"
 ```
 
 ### Detailed Installation Steps for ESPnet and Related Tools
@@ -117,8 +117,6 @@ chime8_official_cleaned/
 ## 1. Download models for CHiME-8 baseline system from Hugging Face
 Visit [Hugging Face CHIME-DASR Repository](https://huggingface.co/chime-dasr/nemo_baseline_models) and download the four model files.   
 You need to agree on Hugging Face's terms and conditions to download the files.  
-huggingface.co/chime-dasr/nemo_baseline_models
-
 
 Prepare the four model files as followings:
 ```
