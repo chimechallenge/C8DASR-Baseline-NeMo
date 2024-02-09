@@ -91,7 +91,7 @@ pip install --upgrade jiwer
 Run the script to install the language model.
 
 ```bash
-./run_install_lm.sh "/your/path/to/NeMo"
+./run_install_lm.sh "/your/path/to/C8DASR_NeMo"
 ```
 
 # A Step-by-Step Guide for launching NeMo CHiME-8 Baseline
@@ -118,7 +118,7 @@ chime8_official_cleaned/
 Visit [Hugging Face CHIME-DASR Repository](https://huggingface.co/chime-dasr/nemo_baseline_models) and download the four model files.   
 You need to agree on Hugging Face's terms and conditions to download the files.  
 
-Prepare the four model files as followings:
+Prepare the four model files as followings in the `CHECKPOINTS` folder:
 ```
 VAD_MODEL_PATH=${CHECKPOINTS}/vad_model.nemo
 MSDD_MODEL_PATH=${CHECKPOINTS}/msdd_model.ckpt
