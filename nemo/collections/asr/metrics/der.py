@@ -182,13 +182,11 @@ def score_labels(
         itemized_errors = (DER, CER, FA, MISS)
 
         if verbose:
-            # logging.info(f"\n{metric.report()}")
-            pass
-        logging.info(
-            "Cumulative Results for collar {} sec and ignore_overlap {}: \n| FA: {:.4f} | MISS: {:.4f} | CER: {:.4f} | DER: {:.4f} | Spk. Count Acc. {:.4f}\n".format(
-                collar, ignore_overlap, FA, MISS, CER, DER, spk_count_acc
+            logging.info(
+                "Cumulative Results for collar {} sec and ignore_overlap {}: \n| FA: {:.4f} | MISS: {:.4f} | CER: {:.4f} | DER: {:.4f} | Spk. Count Acc. {:.4f}\n".format(
+                    collar, ignore_overlap, FA, MISS, CER, DER, spk_count_acc
+                )
             )
-        )
 
         return metric, mapping_dict, itemized_errors
     elif verbose:

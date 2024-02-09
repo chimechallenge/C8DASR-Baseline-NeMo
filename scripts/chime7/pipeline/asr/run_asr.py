@@ -267,13 +267,13 @@ def transcribe_speech(cfg):
                     )
                 else:
                     transcriptions = asr_model.transcribe(
-                        paths2audio_files=filepaths,
+                        audio=filepaths,
                         batch_size=cfg.batch_size,
                         num_workers=cfg.num_workers,
                         return_hypotheses=return_hypotheses,
                         channel_selector=cfg.channel_selector,
                         augmentor=augmentor,
-                        normalize_db=cfg.normalize_db,
+                        # normalize_db=cfg.normalize_db,
                     )
 
         logging.info(f"Finished transcribing {len(filepaths)} files !")

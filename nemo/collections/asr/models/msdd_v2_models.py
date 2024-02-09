@@ -1669,7 +1669,7 @@ class NeuralDiarizer(LightningModule):
         self.use_adaptive_thres = cfg.diarizer.msdd_model.parameters.get('use_adaptive_thres', True)
         self.max_pred_length = cfg.diarizer.msdd_model.parameters.get('max_pred_length', 0)
         self.diar_eval_settings = cfg.diarizer.msdd_model.parameters.get(
-            'diar_eval_settings', [(0.25, False), (0.25, True)]
+            'diar_eval_settings', [(0.25, False)]
         )
         if msdd_model is not None:
             self.msdd_model = msdd_model
@@ -2164,7 +2164,6 @@ class NeuralDiarizer(LightningModule):
             hop_len_in_cs=int(self.feat_per_sec * self.msdd_model.cfg.interpolated_scale/2),
             ts_vad_threshold=self._cfg.diarizer.msdd_model.parameters.ts_vad_threshold,
         )
-
         for k, (collar, ignore_overlap) in enumerate(self.diar_eval_settings):
             output = score_labels(
                 rttm_map,
