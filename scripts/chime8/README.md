@@ -1,98 +1,50 @@
 
-# CHiME-8 DASR Baseline System Setup and Launch Guide
-
-## Environment Setup
-
-- This README outlines the steps to set up your environment for the required operations.Please follow these steps in the order presented to ensure a proper setup.
-- Environments:
-    * [CUDA 11.8](https://developer.nvidia.com/cuda-11-8-0-download-archive)
-    * [CMAKE 3.18](https://cmake.org/)
-    * [python 3.10](https://www.python.org/downloads/release/python-3100/)
-- **NOTE**: Make sure to install the right version of [PyTorch](https://pytorch.org/) that supports the CUDA version you want.
-
+# CHiME-8 DASR Baseline System
 
 ### Prerequisites
 
-- Ensure that you have `git`, `pip`, and `bash` installed on your system.
-- It's assumed that you have CUDA 11.8 compatible hardware and drivers installed for `cupy-cuda11x` to work properly.
+- `git`, `pip`, and `bash` installed on your system.
+- CUDA 11.8 compatible hardware and drivers installed for `cupy-cuda11x` to work properly.
+- [Miniconda](https://docs.anaconda.com/free/miniconda/) or [Anaconda](https://www.anaconda.com/) installed.
+- libsndfile1 ffmpeg packages installed:
+  - `apt-get update && apt-get install -y libsndfile1 ffmpeg`
 
-## Package Installation
+## Installation
 
-This environment is based on the assumption that you installed the latest `NeMo` on your conda environment named `chime8_baseline`
-
-```bash
-conda activate chime8_baseline
-pip install espnet
-git clone https://github.com/espnet/espnet.git /workspace/espnet
-pip uninstall -y 'cupy-cuda118'
-pip install --no-cache-dir -f https://pip.cupy.dev/pre/ "cupy-cuda11x[all]==12.1.0"
-pip install git+http://github.com/desh2608/gss
-pip install optuna
-pip install optuna-fast-fanova gunicorn
-pip install optuna-dashboard
-pip install lhotse==1.14.0
-pip install --upgrade jiwer
-pip install cmake>=3.18
-./run_install_lm.sh "/your/path/to/C8DASR_NeMo"
-```
-
-### Detailed Installation Steps for ESPnet and Related Tools
-
-Use pip to install ESPnet, a toolkit for end-to-end speech processing.
+1. Git clone this repository: 
 
 ```bash
-pip install espnet
+git clone https://github.com/chimechallenge/C8DASR_NeMo
 ```
 
-Clone the ESPnet repository into the `/workspace/espnet` directory.
+2. Create a new conda environment and install the latest Pytorch stable version (2.2.0):
 
 ```bash
-git clone https://github.com/espnet/espnet.git /workspace/espnet
+cd C8DASR_NeMo
+conda create --name c8dasr python==3.10.12
+conda activate c8dasr
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 ```
 
-If you have `cupy-cuda118` installed, uninstall it.
+3. Install NeMo: 
 
 ```bash
-pip uninstall -y 'cupy-cuda118'
+pip install Cython
+pip install nemo_toolkit['all']
 ```
 
-Install version `12.1.0` of `cupy-cuda11x`. This is done from a pre-release channel.
+4. Go to this folder and install the additional dependencies: 
 
 ```bash
-pip install --no-cache-dir -f https://pip.cupy.dev/pre/ "cupy-cuda11x[all]==12.1.0"
+cd scripts/chime8 
+./installers/install_c8_dependencies.sh
 ```
 
-Install GSS from the provided GitHub repository.
+You are ready to go ! <br>
 
-```bash
-pip install git+http://github.com/desh2608/gss
-```
+⚠️ If you encountered any problems please see the [trouble shooting page](./docs/trouble_shooting.md), 
+feel free to raise an issue or [contact us](#contact). 
 
-Optuna, a hyperparameter optimization framework, is installed via pip.
-
-```bash
-pip install optuna
-```
-
-Install a specific version of Lhotse (`1.14.0`).
-Lhotse is mainly needed for Guided Source Separation (GSS) part.
-
-```bash
-pip install lhotse==1.14.0
-```
-
-Upgrade Jiwer, a package for evaluating automatic speech recognition.
-Jiwer is needed for evaluating and normalizing the text.
-
-```bash
-pip install --upgrade jiwer
-```
-
-Run the script to install the language model.
-
-```bash
-./run_install_lm.sh "/your/path/to/C8DASR_NeMo"
-```
 
 # A Step-by-Step Guide for launching NeMo CHiME-8 Baseline
 
@@ -198,3 +150,13 @@ lm_model_path=${LM_MODEL_PATH} \
 diarizer.vad.model_path=${VAD_MODEL_PATH} \
 diarizer.msdd_model.model_path=${MSDD_MODEL_PATH} \
 ```
+
+
+## Environment Setup
+
+- This README outlines the steps to set up your environment for the required operations. Please follow these steps in the order presented to ensure a proper setup.
+- Environments:
+    * [CUDA 11.8](https://developer.nvidia.com/cuda-11-8-0-download-archive)
+    * [CMAKE 3.18](https://cmake.org/)
+    * [python 3.10](https://www.python.org/downloads/release/python-3100/)
+- **NOTE**: Make sure to install the right version of [PyTorch](https://pytorch.org/) that supports the CUDA version you want.
