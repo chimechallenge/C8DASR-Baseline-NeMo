@@ -22,8 +22,6 @@ This environment is based on the assumption that you installed the latest `NeMo`
 
 ```bash
 conda activate chime8_baseline
-pip install espnet
-git clone https://github.com/espnet/espnet.git /workspace/espnet
 pip uninstall -y 'cupy-cuda118'
 pip install --no-cache-dir -f https://pip.cupy.dev/pre/ "cupy-cuda11x[all]==12.1.0"
 pip install git+http://github.com/desh2608/gss
@@ -37,18 +35,6 @@ pip install cmake>=3.18
 ```
 
 ### Detailed Installation Steps for ESPnet and Related Tools
-
-Use pip to install ESPnet, a toolkit for end-to-end speech processing.
-
-```bash
-pip install espnet
-```
-
-Clone the ESPnet repository into the `/workspace/espnet` directory.
-
-```bash
-git clone https://github.com/espnet/espnet.git /workspace/espnet
-```
 
 If you have `cupy-cuda118` installed, uninstall it.
 
@@ -140,7 +126,7 @@ CHECKPOINTS="/path/to/checkpoints"
 TEMP_DIR="/temp/path/to/chime8_baseline_each1sess"
 CHIME_DATA_ROOT="/path/to/chime8_official_cleaned"
 SCENARIOS="[mixer6,chime6,dipco]"
-DIAR_CONFIG="chime8-baseline-mixer6-short1"
+DIAR_CONFIG="chime8-baseline-all-4"
 ```
 
 ## 3. Launch CHiME-8 Baseline 
@@ -160,7 +146,7 @@ CHECKPOINTS=/path/to/checkpoints
 TEMP_DIR=/temp/path/to/chime8_baseline_each1sess
 CHIME_DATA_ROOT=/path/to/chime8_official_cleaned
 SCENARIOS="[mixer6,chime6,dipco,notsofar1]"
-DIAR_CONFIG="chime8-baseline-allfour-short1"
+DIAR_CONFIG="chime8-baseline-all-4"
 MAX_NUM_SPKS=8 # 4 or 8
 STAGE=0 # [stage 0] diarization [stage 1] GSS [stage 2] ASR [stage 3] scoring
 ###########################################################################
