@@ -1,3 +1,13 @@
+## Environment Setup
+
+- This README outlines the steps to set up your environment for the required operations. Please follow these steps in the order presented to ensure a proper setup.
+- Environments:
+    * [CUDA 11.8](https://developer.nvidia.com/cuda-11-8-0-download-archive)
+    * [CMAKE 3.18](https://cmake.org/)
+    * [python 3.10](https://www.python.org/downloads/release/python-3100/)
+- **NOTE**: Make sure to install the right version of [PyTorch](https://pytorch.org/) that supports the CUDA version you want.
+
+
 ## Error: CUDNN_STATUS_NOT_INITIALIZED
 
 `Could not create cudnn handle: CUDNN_STATUS_NOT_INITIALIZED`  

@@ -14,10 +14,10 @@
 
 import logging
 
-from asr.run_asr import run_asr
-from diar.run_diar import run_diarization
-from eval.run_chime_eval import run_chime_evaluation
-from gss_process.run_gss_process import run_gss_process
+from local.asr.run_asr import run_asr
+from local.diar.run_diar import run_diarization
+from local.eval.run_chime_eval import run_chime_evaluation
+from local.gss_process.run_gss_process import run_gss_process
 from omegaconf import DictConfig, OmegaConf
 
 from nemo.core.config import hydra_runner
@@ -50,32 +50,23 @@ def main(cfg):
         skip_stages=cfg.skip_stages,
     )
 
-
     cfg = DictConfig(OmegaConf.to_container(cfg, resolve=True))
-    # split manifests here by session
-    # scenario loop should be here
-    if run_stage_flag(0):
+
+    if run_stage_flag(1):
         logging.info("Running Diarization")
         run_diarization(cfg)
 
-
-    if run_stage_flag(1):
+    if run_stage_flag(2):
         # Run GSS
         logging.info("Running GSS")
         run_gss_process(cfg)
 
     # Run ASR
-    if run_stage_flag(2):
+    if run_stage_flag(3):
         logging.info("Running ASR")
         run_asr(cfg)
 
-    # merge predictions here for current scenario and ASR
-    # score here if possible
-
-    # full predictions here now
-    # Run evaluation
-    # logging.info("Running evaluation")
-    if run_stage_flag(3):
+    if run_stage_flag(4):
         run_chime_evaluation(cfg)
 
 

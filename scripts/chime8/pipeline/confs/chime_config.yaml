@@ -2,7 +2,6 @@
 name: &name "chime8-notsofar"
 
 chime_data_root: /media/data2/chime7-challenge/datasets/chime7_official_cleaned_v2
-
 vad_model_path: /media/data2/chime7-challenge/checkpoints/frame_vad_chime7_acrobat.nemo
 msdd_model_path: /media/data2/chime7-challenge/checkpoints/msdd_v2_PALO_bs6_a003_version6_e53.ckpt 
 asr_model_path: /media/data2/chime7-challenge/checkpoints/rno_chime7_chime6_ft_ptDataSetasrset3_frontend_nemoGSSv1_prec32_layers24_heads8_conv5_d1024_dlayers2_dsize640_bs128_adamw_CosineAnnealing_lr0.0001_wd1e-2_spunigram1024.nemo
