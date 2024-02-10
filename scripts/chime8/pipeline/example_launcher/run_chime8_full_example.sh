@@ -3,7 +3,7 @@
 ### YOUR CUSTOMIZED CONFIGURATIONS HERE ###################################
 NEMO_ROOT=/path/to/NeMo
 CHECKPOINTS=/path/to/checkpoints
-TEMP_DIR=/temp/path/to/chime8_baseline_each1sess
+TEMP_DIR=$PWD/exp
 CHIME_DATA_ROOT=/path/to/chime7_official_cleaned
 SCENARIOS="[mixer6,chime6,dipco]"
 DIAR_CONFIG="chime8-baseline-mixer6-short1"
@@ -11,7 +11,7 @@ DIAR_CONFIG="chime8-baseline-mixer6-short1"
 cd $NEMO_ROOT
 export CUDA_VISIBLE_DEVICES="0"
 
-SCRIPT_NAME=${NEMO_ROOT}/scripts/chime7/pipeline/run_full_pipeline.py
+SCRIPT_NAME=${NEMO_ROOT}/scripts/chime8/pipeline/run_full_pipeline.py
 python -c "import kenlm; print('kenlm imported successfully')" || exit 1
 
 CONFIG_PATH=${NEMO_ROOT}/scripts/chime7/pipeline
