@@ -18,7 +18,7 @@ stop_stage: 100
 skip_stages:
 num_workers: 16
 sample_rate: 16000
-batch_size: 12  # batch size for diarization 8 is max value on A100 40GB
+batch_size: 8  # max value on A100 40GB
 asr_batch_size: 16 # batch size for asr
 max_utt_length: 20 #
 verbose: True # enable additional logging
@@ -42,8 +42,8 @@ audio_type: "flac"
 
 optuna:
   study_name: chime8_optuna  # name of the optuna job
-  storage: sqlite:///optuna-chime8.db  # data will be stored at ./optuna-chime8.db
-  output_log: ./optuna-chime8.log  # where optuna log will be stored
+  storage: sqlite:///${output_root}/optuna-chime8.db  # data will be stored at ./optuna-chime8.db
+  output_log: ${output_root}/optuna-chime8.log  # where optuna log will be stored
   n_trials: 10000  # Number of trials to run with optuna
   n_jobs: -1  # Number of parallel jobs to run, set -1 to use all GPUs
   speaker_output_dir: ${output_root}  # directory for pre-computed embeddings for diarization
@@ -118,14 +118,15 @@ diarizer:
   
   clustering:
     parameters:
+      frame_vad_threshold: 0.8 #${frame_vad_threshold}
       oracle_num_speakers: False # If True, use num of speakers value provided in manifest file.
       max_num_speakers: ${max_num_spks} # Max number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.
-      min_num_speakers: 2 # Max number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.
+      min_num_speakers: 2 # Min number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.
       enhanced_count_thres: 80 # If the number of segments is lower than this number, enhanced speaker counting is activated.
-      max_rp_threshold: 0.06
+      max_rp_threshold: 0.9
       sparse_search_volume: 25 # The higher the number, the more values will be examined with more time. 
       maj_vote_spk_count: False  # If True, take a majority vote on multiple p-values to estimate the number of speakers.
-      clustering_scale_index: 2 # The index of scale to be used for clustering. 
+      clustering_scale_index: 2 # The index of scale to be used for clustering.
       sync_score_thres: 0.9 # Cascaded clustering threshold for deciding whether to proceed to the finer scale.
       max_mc_ch_num: 5
       

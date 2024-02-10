@@ -3,7 +3,8 @@
 ### YOUR CUSTOMIZED CONFIGURATIONS HERE ###################################
 NEMO_ROOT=${PWD}/../../../ # path to your NeMo root
 CHECKPOINTS=${PWD}/models_ckpt # pre-trained models checkpoints will be downloaded here
-EXP_DIR=${PWD}/exp
+OPTUNA_JOB_NAME=optuna-tune-diar
+EXP_DIR=${PWD}/exp_optuna/${OPTUNA_JOB_NAME}
 CHIME_DATA_ROOT=/raid/users/popcornell/CHiME6/tmp_chimeutils/chime8_dasr
 DOWNLOAD_ROOT=/raid/users/popcornell/chime8datasets # put your download folder here
 MIXER6_ROOT=/raid/users/popcornell/mixer6 # you have to put yours
@@ -15,9 +16,7 @@ DIAR_CONFIG="chime8-baseline-mixer6-short1"
 ###########################################################################
 cd $NEMO_ROOT
 
-export CUDA_VISIBLE_DEVICES="0"
-
-SCRIPT_NAME=${NEMO_ROOT}/scripts/chime8/pipeline/inference.py
+SCRIPT_NAME=${NEMO_ROOT}/scripts/chime8/pipeline/tune_diar.py
 python -c "import kenlm; print('kenlm imported successfully')" || exit 1
 
 CONFIG_PATH=${NEMO_ROOT}/scripts/chime8/pipeline/confs
