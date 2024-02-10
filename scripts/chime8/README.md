@@ -1,7 +1,7 @@
 
 # CHiME-8 DASR Baseline System Setup and Launch Guide
 
-## Environment Setup
+# Environment Setup
 
 - This README outlines the steps to set up your environment for the required operations.Please follow these steps in the order presented to ensure a proper setup.
 - Environments:
@@ -16,7 +16,7 @@
 - Ensure that you have `git`, `pip`, and `bash` installed on your system.
 - It's assumed that you have CUDA 11.8 compatible hardware and drivers installed for `cupy-cuda11x` to work properly.
 
-## Package Installation
+### Package Installation
 
 This environment is based on the assumption that you installed the latest `NeMo` on your conda environment named `chime8_baseline`
 
