@@ -17,7 +17,7 @@ import logging
 from local.asr.run_asr import run_asr
 from local.diar.run_diar import run_diarization
 from local.eval.run_chime_eval import run_chime_evaluation
-from local.gss_process.run_gss_process import run_gss_process
+from local.gss.run_gss_process import run_gss_process
 from omegaconf import DictConfig, OmegaConf
 
 from nemo.core.config import hydra_runner
