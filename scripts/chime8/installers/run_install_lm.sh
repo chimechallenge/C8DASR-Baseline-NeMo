@@ -31,8 +31,8 @@ if [ $(id -u) -eq 0 ]; then
   alias aptupdate='apt-get update'
   alias b2install='./b2'
 else
-  alias aptupdate='sudo apt-get update'
-  alias b2install='sudo ./b2'
+  alias aptupdate='apt-get update'
+  alias b2install='./b2'
 fi
 
 aptupdate && apt-get upgrade -y && apt-get install -y swig liblzma-dev && rm -rf /var/lib/apt/lists/* # liblzma needed for flashlight decoder

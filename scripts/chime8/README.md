@@ -38,7 +38,7 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvi
 
 ```bash
 pip install Cython
-pip install nemo_toolkit['all']
+./reinstall.sh
 ```
 
 4. Go to this folder and install the additional dependencies: 

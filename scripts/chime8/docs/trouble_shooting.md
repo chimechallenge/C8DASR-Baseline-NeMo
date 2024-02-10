@@ -1,3 +1,17 @@
+
+## Common issues
+
+- Permission denied e.g.: 
+  -  `bash: ./installers/install_c8_dependencies.sh: Permission denied`  
+  - use `chmod +x` to grant executable privileges. You may want to do it for the entire recipe folder `chmod +x -R .`
+
+- `Exception: Could not deserialize ATN with version  (expected 4).`
+  - pip install omegaconf
+
+- `ImportError: cannot import name 'ImitatesDict' from 'lhotse.lazy' (/home/popcornell/miniconda3/envs/c8dasr/lib/python3.10/site-packages/lhotse/lazy.py)`
+   - pip install lhotse==1.13.0
+
+
 ## Environment Setup
 
 - This README outlines the steps to set up your environment for the required operations. Please follow these steps in the order presented to ensure a proper setup.

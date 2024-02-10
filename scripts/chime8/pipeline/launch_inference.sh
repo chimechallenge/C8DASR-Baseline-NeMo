@@ -4,12 +4,12 @@
 NEMO_ROOT=${PWD}/../../../ # path to your NeMo root
 CHECKPOINTS=${PWD}/models_ckpt # pre-trained models checkpoints will be downloaded here
 EXP_DIR=${PWD}/exp
-CHIME_DATA_ROOT=${PWD}/chime8_dasr
+CHIME_DATA_ROOT=/raid/users/popcornell/CHiME6/tmp_chimeutils/chime8_dasr
 DOWNLOAD_ROOT=/raid/users/popcornell/chime8datasets # put your download folder here
 MIXER6_ROOT=/raid/users/popcornell/mixer6 # you have to put yours
 DGEN_SPLITS="train,dev" # which datasets splits you want to generate, note that evaluation will be available later.
 STAGE=0 # stage 0 downloads the checkpoints and does data generation. inference starts at stage 1.
-SCENARIOS="[mixer6,chime6,dipco]"
+SCENARIOS="[chime6,dipco]"
 DIAR_CONFIG="chime8-baseline-mixer6-short1"
 ###########################################################################
 cd $NEMO_ROOT
@@ -19,7 +19,7 @@ export CUDA_VISIBLE_DEVICES="0"
 SCRIPT_NAME=${NEMO_ROOT}/scripts/chime8/pipeline/inference.py
 python -c "import kenlm; print('kenlm imported successfully')" || exit 1
 
-CONFIG_PATH=${NEMO_ROOT}/scripts/chime8/pipeline
+CONFIG_PATH=${NEMO_ROOT}/scripts/chime8/pipeline/confs
 YAML_NAME="chime_config.yaml"
 
 VAD_MODEL_PATH=${CHECKPOINTS}/vad_model.nemo
@@ -36,7 +36,7 @@ export PYTHONPATH=$NEMO_ROOT:$PYTHONPATH
 
 
 ####### DATA GENERATION AND DOWNLOAD ################
-if $stage -le 0; then
+if [ ${STAGE} -le 0 ]; then
   if [ ! -d $CHECKPOINTS ]; then
     echo "Downloading checkpoints to $CHECKPOINTS"
     mkdir -p $CHECKPOINTS
@@ -68,7 +68,7 @@ python ${SCRIPT_NAME} --config-path="${CONFIG_PATH}" --config-name="$YAML_NAME" 
     diar_config=${DIAR_CONFIG} \
     stage=${STAGE} \
     chime_data_root=${CHIME_DATA_ROOT} \
-    output_root=${TEMP_DIR} \
+    output_root=${EXP_DIR} \
     scenarios=${SCENARIOS} \
     subsets="[dev]" \
     asr_model_path=${ASR_MODEL_PATH} \
