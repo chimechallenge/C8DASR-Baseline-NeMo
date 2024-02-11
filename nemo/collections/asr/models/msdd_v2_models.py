@@ -119,9 +119,7 @@ def _init_dereverb():
         },
         'use_dtype': torch.cfloat, # About 10x faster than torch.cdouble
     }
-     
     fft_length, hop_length = mcf['fft_length'], mcf['hop_length']
-    block_length_sec, block_overlap_sec = mcf['block_length_sec'], mcf['block_overlap_sec']
 
     # Prepare blocks
     stft = AudioToSpectrogram(fft_length=fft_length, hop_length=hop_length).to('cuda')
@@ -135,31 +133,6 @@ def _init_dereverb():
         ).to('cuda')
     return mcf, dereverb, stft, istft
         
-        
-def get_n_params(model):
-    pp=0
-    for p in list(model.parameters()):
-        nn=1
-        for s in list(p.size()):
-            nn = nn*s
-        pp += nn
-    pp_string = str(round(pp / float(10**6), 2)) + "M"
-    print(f"size: {pp_string}")
-    return pp
-
-def check_multiscale_data(method):
-    def wrapper(self, *args, **kwargs):
-        for var_str in ['ms_seg_timestamps', 'ms_seg_counts', 'scale_mapping']:
-            if torch.std(kwargs[var_str].float(), dim=0).sum() != 0:
-                raise ValueError(f"Multi-scale variables should have the same values for all samples in a batch.")
-            check_batch_unity(kwargs[var_str])
-        return method(self, *args, **kwargs)
-    return wrapper
-
-
-def check_batch_unity(batch_tensor):
-    if torch.std(batch_tensor.float(), dim=0).sum() != 0:
-        raise ValueError(f"Multi-scale variables should have the same values for all samples in a batch.")
 
 class AffinityLoss(Loss, Typing):
     """
@@ -212,8 +185,7 @@ class AffinityLoss(Loss, Typing):
         elem_affinity_loss = torch.abs(gt_affinity_margin - batch_affinity_mat_margin)
         positive_samples = gt_affinity * elem_affinity_loss
         negative_samples = (1-gt_affinity) * elem_affinity_loss
-        # affinity_loss = (1-self.gamma) * positive_samples.sum() + self.gamma * negative_samples.sum()
-        affinity_loss = (1-self.gamma) * positive_samples.sum() 
+        affinity_loss = (1-self.gamma) * positive_samples.sum() + self.gamma * negative_samples.sum()
         return affinity_loss
 
 
@@ -397,7 +369,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
 
         self.multichannel_mixing = self.cfg_msdd_model.get('multichannel_mixing', True)
         self.msdd_overlap_add = self.cfg_msdd_model.get("msdd_overlap_add", True)
-        self.use_1ch_from_ch_clus = self.cfg_msdd_model.get("use_1ch_from_ch_clus", True)
         if self.cfg_msdd_model.get("multichannel", None) is not None:
             self.power_p=self.cfg_msdd_model.multichannel.parameters.get("power_p", 4)
             self.mix_count=self.cfg_msdd_model.multichannel.parameters.get("mix_count", 2) 
@@ -671,55 +642,43 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
     def setup_validation_data(self, val_data_layer_config: Optional[Union[DictConfig, Dict]]):
         self._validation_dl = self.__setup_dataloader_from_config(config=val_data_layer_config,)
 
-    def segment_diar_window_test_dataset(self, test_data_config: Optional[Union[DictConfig, Dict]], overlap_add=False, longest_scale_idx=0):
-        test_manifest_jsons = read_manifest(test_data_config['manifest_filepath'])
-        self.segmented_manifest_list, self.uniq_id_segment_counts = [], {}
-        self.multiscale_args_dict = self.msdd_multiscale_args_dict # Use interpolated scale from MSDD model
-        ovl_len = self.msdd_multiscale_args_dict['scale_dict'][longest_scale_idx][0]
-        shift = self.cfg.session_len_sec - 2 * ovl_len
-        if overlap_add:
-            shift = ovl_len 
-        else:
-            shift = self.cfg.session_len_sec - 2 * ovl_len
-            
-        self.diar_window = self.cfg.session_len_sec # v2 setting
-        self.diar_window_shift = self.cfg.session_len_sec - ovl_len # v2 setting
-        self.diar_ovl_len = ovl_len # v2 setting
+    
+    def setup_test_manifest_list(self, test_manifest_jsons, shift, ovl_len):
         session_durations_list = [] 
         for manifest_json in test_manifest_jsons:
             if manifest_json['duration'] is None:
                 manifest_json['duration'] = sox.file_info.duration(manifest_json['audio_filepath'])
             total_duration = float(manifest_json['duration'])
             total_offset = float(manifest_json['offset'])
-            double_ovl = True 
-            
-            if double_ovl:
-                subsegments = []
-                total_chunks = int(np.ceil((total_duration - shift - ovl_len) / shift) + 1)
-                for idx in range(total_chunks):
-                    if self.msdd_overlap_add:
-                        if idx == 0:
-                            subsegments.append((total_offset, self.diar_window))
-                            cursor = shift
-                        elif idx == total_chunks - 1:
-                            dur = total_duration - cursor
-                            subsegments.append((total_offset + cursor, min(self.diar_window, total_duration - cursor)))
-                        else:
-                            subsegments.append((total_offset + cursor, self.diar_window))
-                            cursor += shift
+            subsegments = []
+            total_chunks = int(np.ceil((total_duration - shift - ovl_len) / shift) + 1)
+            self.diar_window = self.cfg.session_len_sec # v2 setting
+            self.diar_window_shift = self.cfg.session_len_sec - ovl_len # v2 setting
+            self.diar_ovl_len = ovl_len # v2 setting
+            for idx in range(total_chunks):
+                if self.msdd_overlap_add:
+                    if idx == 0:
+                        subsegments.append((total_offset, self.diar_window))
+                        cursor = shift
+                    elif idx == total_chunks - 1:
+                        dur = total_duration - cursor
+                        subsegments.append((total_offset + cursor, min(self.diar_window, total_duration - cursor)))
                     else:
-                        if idx == 0:
-                            subsegments.append((total_offset, self.diar_window))
-                            cursor = self.diar_window
-                        elif idx == total_chunks - 1:
-                            dur = total_duration - (cursor - 2*ovl_len)
-                            subsegments.append((total_offset + cursor - 2*ovl_len, min(self.diar_window, total_duration - (cursor - 2*ovl_len))))
-                        else:
-                            subsegments.append((total_offset + cursor - 2*ovl_len, self.diar_window))
-                            cursor = cursor - 2*ovl_len + self.diar_window
-              
-                if abs((subsegments[-1][0] + subsegments[-1][1]) - (total_offset + total_duration)) > 1e-5:
-                    raise ValueError("Last subsegment end time is not equal to total duration")
+                        subsegments.append((total_offset + cursor, self.diar_window))
+                        cursor += shift
+                else:
+                    if idx == 0:
+                        subsegments.append((total_offset, self.diar_window))
+                        cursor = self.diar_window
+                    elif idx == total_chunks - 1:
+                        dur = total_duration - (cursor - 2*ovl_len)
+                        subsegments.append((total_offset + cursor - 2*ovl_len, min(self.diar_window, total_duration - (cursor - 2*ovl_len))))
+                    else:
+                        subsegments.append((total_offset + cursor - 2*ovl_len, self.diar_window))
+                        cursor = cursor - 2*ovl_len + self.diar_window
+            
+            if abs((subsegments[-1][0] + subsegments[-1][1]) - (total_offset + total_duration)) > 1e-5:
+                raise ValueError("Last subsegment end time is not equal to total duration")
             session_durations_list.append(manifest_json['duration'])
             if isinstance(manifest_json['audio_filepath'], list):
                 uniq_id = manifest_json['uniq_id'] # Multi-channel 
@@ -734,13 +693,26 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
                 segment_manifest_json['offset'], segment_manifest_json['duration'] = stt, dur
                 self.segmented_manifest_list.append(segment_manifest_json)
                 self.uniq_id_segment_counts[uniq_id] += 1
+        return session_durations_list
+    
+    def segment_diar_window_test_dataset(self, test_data_config: Optional[Union[DictConfig, Dict]], overlap_add=False, longest_scale_idx=0):
+        test_manifest_jsons = read_manifest(test_data_config['manifest_filepath'])
+        self.segmented_manifest_list, self.uniq_id_segment_counts = [], {}
+        self.multiscale_args_dict = self.msdd_multiscale_args_dict # Use interpolated scale from MSDD model
+        ovl_len = self.msdd_multiscale_args_dict['scale_dict'][longest_scale_idx][0]
+        shift = self.cfg.session_len_sec - 2 * ovl_len
+        if overlap_add:
+            shift = ovl_len 
+        else:
+            shift = self.cfg.session_len_sec - 2 * ovl_len
+            
+        session_durations_list = self.setup_test_manifest_list(test_manifest_jsons, shift, ovl_len)
         max_dur = max(session_durations_list)
-        max_duration_json = test_manifest_jsons[session_durations_list.index(max_dur)]
         scale_n = len(self.multiscale_args_dict['scale_dict'])
         max_len_ms_ts, ms_seg_counts = get_ms_seg_timestamps(uniq_id='[max_len]', 
                                                             offset=0, 
                                                             duration=max_dur, 
-                                                            feat_per_sec=100, 
+                                                            feat_per_sec=self.frame_per_sec, 
                                                             scale_n=scale_n,
                                                             multiscale_args_dict=self.multiscale_args_dict,
                                                             dtype=torch.float,
@@ -757,27 +729,24 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
                                                   batch_size=1)
         if overlap_add:
             if '.msdd_segmented.json' not in test_data_config.manifest_filepath:
-                msdd_segmented_manifest_path = test_data_config.manifest_filepath.replace('.json', '.msdd_segmented.json') 
-            self.msdd_segmented_manifest_path = msdd_segmented_manifest_path
-            test_data_config.manifest_filepath = msdd_segmented_manifest_path
+                self.msdd_segmented_manifest_path = test_data_config.manifest_filepath.replace('.json', '.msdd_segmented.json') 
+            test_data_config.manifest_filepath = self.msdd_segmented_manifest_path
             self.msdd_segmented_manifest_list = copy.deepcopy(self.segmented_manifest_list)
-            if not os.path.exists(msdd_segmented_manifest_path):
-                write_manifest(output_path=msdd_segmented_manifest_path, target_manifest=self.msdd_segmented_manifest_list)
+            if not os.path.exists(self.msdd_segmented_manifest_path):
+                write_manifest(output_path=self.msdd_segmented_manifest_path, target_manifest=self.msdd_segmented_manifest_list)
         else:
             if '.segmented.json' not in test_data_config.manifest_filepath:
-                segmented_manifest_path = test_data_config.manifest_filepath.replace('.json', '.segmented.json') 
-            self.segmented_manifest_path = segmented_manifest_path
-            test_data_config.manifest_filepath = segmented_manifest_path
+                self.segmented_manifest_path = test_data_config.manifest_filepath.replace('.json', '.segmented.json') 
+            test_data_config.manifest_filepath = self.segmented_manifest_path
             self.segmented_manifest_list = copy.deepcopy(self.segmented_manifest_list)
-            if not os.path.exists(segmented_manifest_path):
-                write_manifest(output_path=segmented_manifest_path, target_manifest=self.segmented_manifest_list)
+            if not os.path.exists(self.segmented_manifest_path):
+                write_manifest(output_path=self.segmented_manifest_path, target_manifest=self.segmented_manifest_list)
             
             if '.msdd_segmented.json' not in test_data_config.manifest_filepath:
-                msdd_segmented_manifest_path = test_data_config.manifest_filepath.replace('.segmented.json', '.msdd_segmented.json')
-            self.msdd_segmented_manifest_path = msdd_segmented_manifest_path
+                self.msdd_segmented_manifest_path = test_data_config.manifest_filepath.replace('.segmented.json', '.msdd_segmented.json')
             self.msdd_segmented_manifest_list = copy.deepcopy(self.segmented_manifest_list)
-            if not os.path.exists(msdd_segmented_manifest_path):
-                write_manifest(output_path=msdd_segmented_manifest_path, target_manifest=self.msdd_segmented_manifest_list)
+            if not os.path.exists(self.msdd_segmented_manifest_path):
+                write_manifest(output_path=self.msdd_segmented_manifest_path, target_manifest=self.msdd_segmented_manifest_list)
         return test_data_config, max_len_ms_ts_rep, max_len_scale_mapping
     
     def setup_mc_test_data(self, test_data_config: Optional[Union[DictConfig, Dict]], global_input_segmentation=True):
@@ -853,7 +822,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         ms_seg_counts: torch.Tensor, 
         ms_seg_timestamps: torch.Tensor,
     ):
-        # check_ms_data(ms_seg_timestamps, ms_seg_counts, scale_mapping)
         batch_size = scale_mapping.shape[0]
         split_emb_tup = torch.split(embs, ms_seg_counts[:, :self.emb_scale_n].flatten().tolist(), dim=0)
         ms_ts = ms_seg_timestamps[:, :, :ms_seg_counts[0][self.emb_scale_n-1],:]
@@ -923,10 +891,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         ms_emb_seq:torch.Tensor, 
         clus_label_index: torch.Tensor, 
         seq_lengths: torch.Tensor, 
-        affinity_weighting: bool = False,
-        add_sil_embs: bool = False,
-        power_p_aff: float = 3,
-        thres_aff: float = 0.5,
     ) -> torch.Tensor:
         """
         `max_base_seq_len` is the longest base scale sequence length can be used for batch processing.
@@ -938,15 +902,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
                 Cluster label index for each segment in the batch.
             seq_lengths (Tensor):
                 Sequence lengths for each segment in the batch.
-            affinity_weighting (bool):
-                If True, the cluster average embeddings are weighted by the purity of the cluster.
-                affinity weighting is intended to filter out speaker-overlapping segments which show low purity.
-            add_sil_embs (bool):
-                If True, the cluster average embeddings are weighted by the purity of the cluster.
-            power_p_aff (float):
-                Power for affinity weighting.
-            thres_aff (float):
-                Threshold for affinity weighting.
 
         Returns:
             ms_avg_embs (Tensor):
@@ -1188,12 +1143,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         vad_probs_frame = torch.repeat_interleave(vad_probs, self.subsample_vad, dim=1)
         return vad_probs_frame
     
-    def mix_mc_vad(self, mc_log_probs):
-        mc_vad_probs = torch.softmax(mc_log_probs, dim=-1)[:,:,:,1]
-        mono_vad_probs = mc_vad_probs.max(dim=1)[0]
-        vad_probs_frame = torch.repeat_interleave(mono_vad_probs, self.subsample_vad, dim=1)
-        return vad_probs_frame
-    
     def forward_encoder(
         self, 
         audio_signal, 
@@ -1202,7 +1151,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         ms_seg_counts, 
         scale_mapping, 
         ch_clus_mat,
-        mc_max_vad=True,
     ):
         """
         Encoder part for end-to-end diarizaiton model.
@@ -1214,7 +1162,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         self.msdd_classifier = self.msdd_classifier.to(self.device)
         if self.mc_audio_normalize:
             audio_signal = (1/(audio_signal.max()+self.eps)) * audio_signal 
-            
         if self.multichannel_mixing and len(audio_signal.shape) > 2: # Check if audio_signal is multichannel
             audio_signal, mc_vad_logits = self._mix_to_mono(audio_signal_batch=audio_signal, 
                                                             audio_signal_len_batch=audio_signal_length, 
@@ -1224,11 +1171,7 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         processed_signal, processed_signal_length = self.msdd._speaker_model.preprocessor(
             input_signal=audio_signal, length=audio_signal_length
         )
-        
-        if self.multichannel_mixing and self.mc_max_vad:
-            vad_probs_frame = self.mix_mc_vad(mc_log_probs=mc_vad_logits)
-        else:
-            vad_probs_frame = self.forward_vad(audio_signal=audio_signal, audio_signal_length=audio_signal_length)
+        vad_probs_frame = self.forward_vad(audio_signal=audio_signal, audio_signal_length=audio_signal_length)
         
         # preds = generate_vad_segment_table_per_tensor(vad_probs_frame[0], per_args=per_args)
         embs, pools, vad_probs, vad_probs_segments = self.forward_multiscale(
@@ -1358,7 +1301,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
             ms_seg_counts=ms_seg_counts,
             scale_mapping=scale_mapping,
             ch_clus_mat=ch_clus_mat,
-            mc_max_vad=self.mc_max_vad,
         )
         ms_pools_seq = ms_pools_seq.mean(dim=2)
         # Step 2: Clustering for initialization
@@ -1368,13 +1310,7 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         if vad_probs is not None: # Apply VAD to clustering results
             clus_label_index[vad_probs < self.vad_thres] == -1
             
-        ms_avg_embs, ms_avg_var_weights = self.get_cluster_avg_embs_model(ms_emb_seq, 
-                                                                            clus_label_index, 
-                                                                            ms_seg_counts[:,-1], 
-                                                                            affinity_weighting=self.affinity_weighting,
-                                                                            power_p_aff= self.power_p_aff,
-                                                                            thres_aff = self.thres_aff,
-                                                                            add_sil_embs=True)
+        ms_avg_embs, ms_avg_var_weights = self.get_cluster_avg_embs_model(ms_emb_seq, clus_label_index, ms_seg_counts[:,-1])
 
         # Step 3: MSDD Inference
         preds, scale_weights = self.forward_infer(ms_emb_seq=ms_emb_seq, seq_lengths=ms_seg_counts[:, -1], ms_avg_embs=ms_avg_embs)
@@ -1641,14 +1577,8 @@ class ClusterEmbedding(torch.nn.Module):
 
         self.msdd_model.cfg_msdd_model.max_num_of_spks = cfg.diarizer.clustering.parameters.max_num_speakers
         
-        self.msdd_model.affinity_weighting = cfg.diarizer.msdd_model.parameters.affinity_weighting
-        self.msdd_model.power_p_aff = cfg.diarizer.msdd_model.parameters.power_p_aff
-        self.msdd_model.thres_aff = cfg.diarizer.msdd_model.parameters.thres_aff
-        self.msdd_model.mc_max_vad = cfg.diarizer.multichannel.parameters.mc_max_vad
         self.msdd_model.mc_audio_normalize = cfg.diarizer.multichannel.parameters.mc_audio_normalize
        
-        self.msdd_model.power_p = cfg.diarizer.multichannel.parameters.power_p
-        self.msdd_model.mix_count = cfg.diarizer.multichannel.parameters.mix_count
         
  
 class NeuralDiarizer(LightningModule):
@@ -1663,11 +1593,6 @@ class NeuralDiarizer(LightningModule):
         self._cfg = cfg
         # Parameter settings for MSDD model
         self.use_speaker_model_from_ckpt = cfg.diarizer.msdd_model.parameters.get('use_speaker_model_from_ckpt', True)
-        self.use_clus_as_main = cfg.diarizer.msdd_model.parameters.get('use_clus_as_main', False)
-        self.max_overlap_spks = cfg.diarizer.msdd_model.parameters.get('max_overlap_spks', 2)
-        self.num_spks_per_model = cfg.diarizer.msdd_model.parameters.get('num_spks_per_model', 2)
-        self.use_adaptive_thres = cfg.diarizer.msdd_model.parameters.get('use_adaptive_thres', True)
-        self.max_pred_length = cfg.diarizer.msdd_model.parameters.get('max_pred_length', 0)
         self.diar_eval_settings = cfg.diarizer.msdd_model.parameters.get(
             'diar_eval_settings', [(0.25, False)]
         )
@@ -1709,7 +1634,6 @@ class NeuralDiarizer(LightningModule):
         self.use_var_weights = self._cfg.diarizer.msdd_model.parameters.use_var_weights
         
         self.msdd_model.msdd_overlap_add = self._cfg.diarizer.msdd_model.parameters.msdd_overlap_add
-        self.msdd_model.use_1ch_from_ch_clus = self._cfg.diarizer.msdd_model.parameters.use_1ch_from_ch_clus
 
         self.msdd_model.cfg_msdd_model.diarizer.out_dir = cfg.diarizer.out_dir
         self.msdd_model.cfg_msdd_model.test_ds.manifest_filepath = cfg.diarizer.manifest_filepath
@@ -1832,24 +1756,11 @@ class NeuralDiarizer(LightningModule):
         thresholds = list(self._cfg.diarizer.msdd_model.parameters.sigmoid_threshold)
         for threshold in thresholds:
             outputs = self.run_overlap_aware_eval(preds, ms_ts, threshold, verbose=verbose)
-        if verbose:
-            self.print_configs()
         return outputs
-    
-    def print_configs(self):
-        print(f"MSDD v2 model: {self._cfg.diarizer.msdd_model.model_path}")
-        print(f"global_average_mix_ratio: {self._cfg.diarizer.msdd_model.parameters.global_average_mix_ratio}")
-        print(f"diarizer.multichannel.parameters: {self._cfg.diarizer.multichannel.parameters}")
-        print(f"diarizer.clustering.parameters {self._cfg.diarizer.clustering.parameters}")
-        print(f"diarizer.vad.parameters {self._cfg.diarizer.vad.parameters}")
-        print(f"diarizer.msdd_model.parameters {self._cfg.diarizer.msdd_model.parameters}")
-        print(f"diarizer.manifest_filepath: {self._cfg.diarizer.manifest_filepath}")
-    
+
     def collect_ms_avg_embs(self, ms_avg_embs_current, batch_uniq_ids):
         for sample_idx, uniq_id in enumerate(batch_uniq_ids):
             if uniq_id in self.ms_avg_embs_cache:
-                # if len( ms_avg_embs_current[sample_idx].unsqueeze(0).shape ) == 5:
-                #     max([self.ms_avg_embs_cache[uniq_id].shape[4], ms_avg_embs_current[sample_idx].unsqueeze(0).shape[4]])
                 self.ms_avg_embs_cache[uniq_id] = torch.cat((self.ms_avg_embs_cache[uniq_id], ms_avg_embs_current[sample_idx].unsqueeze(0)), dim=0)
             else:
                 self.ms_avg_embs_cache[uniq_id] = ms_avg_embs_current[sample_idx].unsqueeze(0)
@@ -1925,7 +1836,7 @@ class NeuralDiarizer(LightningModule):
                 ms_emb_seq = mc_ms_emb_seq_bi.permute(3, 0, 1, 2)
                 clus_label_index = mc_clus_label_index[bi].repeat(ms_emb_seq.shape[0], 1)
                 seq_lengths = torch.max(mc_seq_lengths).repeat(ms_emb_seq.shape[0])
-                ms_avg_embs_current, ms_avg_var_weights = self.msdd_model.get_cluster_avg_embs_model(ms_emb_seq, clus_label_index, seq_lengths, add_sil_embs=False)
+                ms_avg_embs_current, ms_avg_var_weights = self.msdd_model.get_cluster_avg_embs_model(ms_emb_seq, clus_label_index, seq_lengths)
                 ms_avg_embs_current, ms_avg_var_weights = ms_avg_embs_current.to(self.msdd_model.device), ms_avg_var_weights.to(self.msdd_model.device)
                 mc_ms_avg_embs = ms_avg_embs_current.permute(1,2,3,0).unsqueeze(0) # (1, scale_n, emb_dim, num_spks, max_ch) - first dim is batch
                 single_uniq_id_list = [batch_uniq_ids[bi]] 
@@ -1949,7 +1860,7 @@ class NeuralDiarizer(LightningModule):
                 ms_emb_seq = mc_ms_emb_seq_bi.permute(3, 0, 1, 2)
                 clus_label_index = mc_clus_label_index[bi].repeat(ms_emb_seq.shape[0], 1)
                 seq_lengths = torch.max(mc_seq_lengths).repeat(ms_emb_seq.shape[0])
-                ms_avg_embs_current, ms_avg_var_weights = self.msdd_model.get_cluster_avg_embs_model(ms_emb_seq, clus_label_index, seq_lengths, add_sil_embs=False)
+                ms_avg_embs_current, ms_avg_var_weights = self.msdd_model.get_cluster_avg_embs_model(ms_emb_seq, clus_label_index, seq_lengths)
                 ms_avg_embs_current, ms_avg_var_weights = ms_avg_embs_current.to(self.msdd_model.device), ms_avg_var_weights.to(self.msdd_model.device)
                 ms_emb_seq = ms_emb_seq.type(ms_avg_embs_current.dtype)
                 single_uniq_id_list = [batch_uniq_ids[bi]] 
@@ -1999,7 +1910,7 @@ class NeuralDiarizer(LightningModule):
         batch_size = self.msdd_model.cfg.test_ds.batch_size
 
         cumul_sample_count = [0]
-        preds_list, targets_list, timestamps_list = [], [], []
+        preds_list, targets_list = [], []
         device = self.msdd_model.device
         all_manifest_uniq_ids = get_uniq_id_list_from_manifest(self.msdd_model.msdd_segmented_manifest_path)
         
@@ -2008,7 +1919,7 @@ class NeuralDiarizer(LightningModule):
         for test_batch_idx, test_batch in enumerate(tqdm(self.msdd_model.test_dataloader(), desc="Computing average embeddings", leave=False)):
             ms_emb_seq, _, seq_lengths, clus_label_index, targets = test_batch
             batch_uniq_ids = all_manifest_uniq_ids[test_batch_idx * batch_size: (test_batch_idx+1) * batch_size]
-            ms_avg_embs_current, ms_avg_var_weights = self.msdd_model.get_cluster_avg_embs_model(ms_emb_seq, clus_label_index, seq_lengths, add_sil_embs=False)
+            ms_avg_embs_current, ms_avg_var_weights = self.msdd_model.get_cluster_avg_embs_model(ms_emb_seq, clus_label_index, seq_lengths)
             ms_avg_embs_current, ms_avg_var_weights = ms_avg_embs_current.to(self.msdd_model.device), ms_avg_var_weights.to(self.msdd_model.device)
             self.collect_ms_avg_embs(ms_avg_embs_current, batch_uniq_ids)
             
@@ -2021,7 +1932,7 @@ class NeuralDiarizer(LightningModule):
             
             ms_emb_seq, seq_lengths, clus_label_index, targets = ms_emb_seq.to(device), seq_lengths.to(device), clus_label_index.to(device), targets.to(device)
             cumul_sample_count.append(cumul_sample_count[-1] + seq_lengths.shape[0])
-            ms_avg_embs_current, ms_avg_var_weights = self.msdd_model.get_cluster_avg_embs_model(ms_emb_seq, clus_label_index, seq_lengths, add_sil_embs=False)
+            ms_avg_embs_current, ms_avg_var_weights = self.msdd_model.get_cluster_avg_embs_model(ms_emb_seq, clus_label_index, seq_lengths)
             ms_avg_embs_current, ms_avg_var_weights = ms_avg_embs_current.to(self.msdd_model.device), ms_avg_var_weights.to(self.msdd_model.device)
             ms_emb_seq = ms_emb_seq.type(ms_avg_embs_current.dtype)
             
@@ -2051,16 +1962,6 @@ class NeuralDiarizer(LightningModule):
         self.scale_mapping = {} 
         all_manifest_uniq_ids = get_uniq_id_list_from_manifest(self.msdd_model.msdd_segmented_manifest_path)
         ovl = int(self.msdd_model.diar_ovl_len / (self.msdd_model.cfg.interpolated_scale/2))-1
-        if self.msdd_model.msdd_overlap_add:
-            shift = self.msdd_model.diar_ovl_len
-            shift_n = int(shift / (self.msdd_model.cfg.interpolated_scale/2))
-            ovl_sec = self.msdd_model.diar_ovl_len
-            ovl_add_len = int( (self.msdd_model.cfg_msdd_model.session_len_sec - shift - ovl_sec)  / (self.msdd_model.cfg.interpolated_scale/2))
-            overlap_add = True
-        else:
-            shift = self.msdd_model.cfg_msdd_model.session_len_sec - 2*ovl
-            ovl_add_len = None
-            overlap_add = False
 
         for batch_idx, (preds, targets) in enumerate(zip(all_preds_list, all_targets_list)):
             batch_uniq_ids = all_manifest_uniq_ids[batch_idx * batch_size: (batch_idx+1) * batch_size ]
@@ -2080,47 +1981,21 @@ class NeuralDiarizer(LightningModule):
                     targets_add = all_targets_list[batch_idx][sample_id][(ovl+1):last_trunc_index]
                     count_add = torch.ones((preds_add.shape[0]))
                 else:
-                    if overlap_add and preds_trunc is not None:
-                        preds_add = all_preds_list[batch_idx][sample_id]
-                        overlap_tgt_len = int(preds_add[ovl+1:-ovl].shape[0] - shift_n)
-                        preds_add[(ovl+1):(ovl+overlap_tgt_len+1)] = preds_add[(ovl+1):(ovl+overlap_tgt_len+1)] + preds_trunc[-overlap_tgt_len:]
-                        targets_add = all_targets_list[batch_idx][sample_id][ovl+1:-ovl]
-                        count_add = torch.ones((preds_add.shape[0])) 
-                        count_add[(ovl+1):(ovl+overlap_tgt_len+1)] = count_add[(ovl+1):(ovl+overlap_tgt_len+1)] + count_trunc[-overlap_tgt_len:]
-                        preds_add = preds_add[(ovl+1):-ovl]
-                        count_add = count_add[(ovl+1):-ovl]
-                    else: 
-                        preds_add = all_preds_list[batch_idx][sample_id][ovl+1:-ovl]
-                        targets_add = all_targets_list[batch_idx][sample_id][ovl+1:-ovl]
-                        count_add = torch.ones((preds_add.shape[0]))
+                    preds_add = all_preds_list[batch_idx][sample_id][ovl+1:-ovl]
+                    targets_add = all_targets_list[batch_idx][sample_id][ovl+1:-ovl]
+                    count_add = torch.ones((preds_add.shape[0]))
                 
                 if uniq_id in self.preds:
                     if preds_add.shape[0] > 0: # If ts_add has valid length
                         self.msdd_uniq_id_segment_counts[uniq_id] += 1
-                        if overlap_add and preds_trunc is not None:
-                            ovl_add_len_cat = int(preds_add.shape[0] - shift_n)
-                            if ovl_add_len_cat > 0:
-                                self.preds[uniq_id] = torch.cat((preds_trunc[:-ovl_add_len_cat], preds_add), dim=0)
-                                self.targets[uniq_id] = torch.cat((targets_trunc[:-ovl_add_len_cat], targets_add), dim=0)
-                                self.rep_counts[uniq_id] = torch.cat((count_trunc[:-ovl_add_len_cat], count_add), dim=0)
-                        else:
-                            self.preds[uniq_id] = torch.cat((preds_trunc, preds_add), dim=0)
-                            self.targets[uniq_id] = torch.cat((targets_trunc, targets_add), dim=0)
-                            self.rep_counts[uniq_id] = torch.cat((count_trunc, count_add), dim=0)
+                        self.preds[uniq_id] = torch.cat((preds_trunc, preds_add), dim=0)
+                        self.targets[uniq_id] = torch.cat((targets_trunc, targets_add), dim=0)
+                        self.rep_counts[uniq_id] = torch.cat((count_trunc, count_add), dim=0)
                 else:
                     self.msdd_uniq_id_segment_counts[uniq_id] = 1
                     self.preds[uniq_id] = all_preds_list[batch_idx][sample_id][ :-ovl]
                     self.targets[uniq_id] = all_targets_list[batch_idx][sample_id][ :-ovl]
                     self.rep_counts[uniq_id] = torch.ones((self.preds[uniq_id].shape[0]))
-        
-        if overlap_add:
-            for uniq_id in self.preds:
-                p_shape = self.preds[uniq_id].shape
-                if len(p_shape) > 2: # Multi-channel Calse
-                    sum_counts = self.rep_counts[uniq_id].unsqueeze(1).unsqueeze(2).repeat(1, p_shape[1], p_shape[2])
-                else:
-                    sum_counts = self.rep_counts[uniq_id].unsqueeze(1).repeat(1, p_shape[1])
-                self.preds[uniq_id] = self.preds[uniq_id]/sum_counts
         return self.preds, self.targets
 
     def run_overlap_aware_eval(
