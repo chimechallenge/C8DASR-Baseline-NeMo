@@ -23,8 +23,8 @@ from omegaconf import DictConfig, OmegaConf
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from functools import partial
-from functools import partial
 import numpy as np
+
 
 def run_stage(stage_num, start_stage=-1, stop_stage=np.inf, skip_stages=None):
     """Simple helper function to avoid boilerplate code for stages"""
