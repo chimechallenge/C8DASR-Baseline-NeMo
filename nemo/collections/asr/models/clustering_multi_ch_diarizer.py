@@ -617,7 +617,7 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
             multiscale_weights=self._diarizer_params.speaker_embeddings.parameters.multiscale_weights,
             multiscale_dict=self.multiscale_args_dict['scale_dict'],
             verbose=self.verbose,
-            vad_threshold=self._diarizer_params.vad.parameters.frame_vad_threshold,
+            vad_threshold=self._diarizer_params.clustering.parameters.frame_vad_threshold,
             device=self._diarizer_model.device,
         )
         return uniq_clus_embs
