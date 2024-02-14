@@ -1,26 +1,32 @@
 
-# CHiME-8 DASR Baseline System Setup and Launch Guide
+# CHiME-8 DASR Baseline System
 
+[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/chimechallenge.svg?style=social&label=Follow%20%40chimechallenge)](https://twitter.com/chimechallenge)
+[![Slack][slack-badge]][slack-invite]
 # Environment Setup
 
-- This README outlines the steps to set up your environment for the required operations.Please follow these steps in the order presented to ensure a proper setup.
-- Environments:
-    * [CUDA 11.8](https://developer.nvidia.com/cuda-11-8-0-download-archive)
-    * [CMAKE 3.18](https://cmake.org/)
-    * [python 3.10](https://www.python.org/downloads/release/python-3100/)
-- **NOTE**: Make sure to install the right version of [PyTorch](https://pytorch.org/) that supports the CUDA version you want.
+--- 
 
+- Challenge official website page: https://www.chimechallenge.org/current/task1/index
+- If you want to participate please fill this [Google form](https://forms.gle/9NdhZbDEtbto4Bxn6) (one contact person per-team only).
 
 ### Prerequisites
 
-- Ensure that you have `git`, `pip`, and `bash` installed on your system.
-- It's assumed that you have CUDA 11.8 compatible hardware and drivers installed for `cupy-cuda11x` to work properly.
+- `git`, `pip`, and `bash` installed on your system.
+- CUDA 11.8 compatible hardware and drivers installed for `cupy-cuda11x` to work properly.
+- [Miniconda](https://docs.anaconda.com/free/miniconda/) or [Anaconda](https://www.anaconda.com/) installed.
+- libsndfile1 ffmpeg packages installed:
+  - `apt-get update && apt-get install -y libsndfile1 ffmpeg`
 
 ### Package Installation
 
-This environment is based on the assumption that you installed the latest `NeMo` on your conda environment named `chime8_baseline`
+1. Git clone this repository: 
 
 ```bash
+git clone https://github.com/chimechallenge/C8DASR_NeMo
+```
+
+2. Create a new conda environment and install the latest Pytorch stable version (2.2.0):
 conda activate chime8_baseline
 pip uninstall -y 'cupy-cuda118'
 pip install --no-cache-dir -f https://pip.cupy.dev/pre/ "cupy-cuda11x[all]==12.1.0"
@@ -39,50 +45,44 @@ pip install cmake>=3.18
 If you have `cupy-cuda118` installed, uninstall it.
 
 ```bash
-pip uninstall -y 'cupy-cuda118'
+cd C8DASR_NeMo
+conda create --name c8dasr python==3.10.12
+conda activate c8dasr
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 ```
 
-Install version `12.1.0` of `cupy-cuda11x`. This is done from a pre-release channel.
+3. Install NeMo: 
 
 ```bash
-pip install --no-cache-dir -f https://pip.cupy.dev/pre/ "cupy-cuda11x[all]==12.1.0"
+pip install Cython
+./reinstall.sh
 ```
 
-Install GSS from the provided GitHub repository.
+4. Go to this folder and install the additional dependencies: 
 
 ```bash
-pip install git+http://github.com/desh2608/gss
+cd scripts/chime8 
+./installers/install_c8_dependencies.sh
 ```
 
-Optuna, a hyperparameter optimization framework, is installed via pip.
+✅ You are ready to go ! <br>
+
+⚠️ If you encountered any problems please see the [trouble shooting page](./docs/trouble_shooting.md), 
+feel free to raise an issue or [contact us](#contact).
+
+
+## Launching NeMo CHiME-8 Baseline Inference
+
+We provide an end-to-end script for data generation and inference with the pre-trained baseline NeMo models: 
+`pipeline/launch_inference.sh`.
 
 ```bash
-pip install optuna
+./pipeline/launch_inference.sh --DOWNLOAD_ROOT <YOUR_DOWNLOAD_DIR> --MIXER6_ROOT <YOUR_MIXER6_DIR> 
+
 ```
 
-Install a specific version of Lhotse (`1.14.0`).
-Lhotse is mainly needed for Guided Source Separation (GSS) part.
 
-```bash
-pip install lhotse==1.14.0
-```
-
-Upgrade Jiwer, a package for evaluating automatic speech recognition.
-Jiwer is needed for evaluating and normalizing the text.
-
-```bash
-pip install --upgrade jiwer
-```
-
-Run the script to install the language model.
-
-```bash
-./run_install_lm.sh "/your/path/to/C8DASR_NeMo"
-```
-
-# A Step-by-Step Guide for launching NeMo CHiME-8 Baseline
-
-## 0. Data Preparation
+## Data Generation
 
 Please find the data preparation scripts at chime-utils repository [CHiME Challenge Utils: github.com/chimechallenge/chime-utils](https://github.com/chimechallenge/chime-utils).
 You will provide a folder containing datasets and annotations as follows.
@@ -99,10 +99,6 @@ chime8_official_cleaned/
 └── notsofar1/
 ```
 
-
-## 1. Download models for CHiME-8 baseline system from Hugging Face
-Visit [Hugging Face CHIME-DASR Repository](https://huggingface.co/chime-dasr/nemo_baseline_models) and download the four model files.   
-You need to agree on Hugging Face's terms and conditions to download the files.  
 
 Prepare the four model files as followings in the `CHECKPOINTS` folder:
 ```
@@ -184,3 +180,13 @@ lm_model_path=${LM_MODEL_PATH} \
 diarizer.vad.model_path=${VAD_MODEL_PATH} \
 diarizer.msdd_model.model_path=${MSDD_MODEL_PATH} \
 ```
+
+
+<h3>📩 Contact Us/Stay Tuned</h3>
+If you need help, we have also a [CHiME Slack Workspace][slack-invite], you can join the **chime-8-dasr channel** there or contact the organizers directly.
+Consider also to join the <a href="https://groups.google.com/g/chime5/">CHiME Google Group</a>. <br>
+Please join these two if you plan to participate in this challenge in order to stay updated. 
+
+[slack-badge]: https://img.shields.io/badge/slack-chat-green.svg?logo=slack
+[slack-invite]: https://join.slack.com/t/chime-fey5388/shared_invite/zt-1oha0gedv-JEUr1mSztR7~iK9AxM4HOA
+[twitter]: https://twitter.com/chimechallenge<h2>References</h2>

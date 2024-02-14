@@ -2,7 +2,6 @@
 name: &name "chime8-notsofar"
 
 chime_data_root: /media/data2/chime7-challenge/datasets/chime7_official_cleaned_v2
-
 vad_model_path: /media/data2/chime7-challenge/checkpoints/frame_vad_chime7_acrobat.nemo
 msdd_model_path: /media/data2/chime7-challenge/checkpoints/msdd_v2_PALO_bs6_a003_version6_e53.ckpt 
 asr_model_path: /media/data2/chime7-challenge/checkpoints/rno_chime7_chime6_ft_ptDataSetasrset3_frontend_nemoGSSv1_prec32_layers24_heads8_conv5_d1024_dlayers2_dsize640_bs128_adamw_CosineAnnealing_lr0.0001_wd1e-2_spunigram1024.nemo
@@ -19,7 +18,7 @@ stop_stage: 100
 skip_stages:
 num_workers: 16
 sample_rate: 16000
-batch_size: 12  # batch size for diarization 8 is max value on A100 40GB
+batch_size: 12  # max value on A100 40GB
 asr_batch_size: 16 # batch size for asr
 max_utt_length: 20 #
 verbose: True # enable additional logging
@@ -43,11 +42,11 @@ audio_type: "flac"
 
 optuna:
   study_name: chime8_optuna  # name of the optuna job
-  storage: sqlite:///optuna-chime8.db  # data will be stored at ./optuna-chime8.db
-  output_log: ./optuna-chime8.log  # where optuna log will be stored
+  storage: sqlite:///${output_root}/optuna-chime8.db  # data will be stored at ./optuna-chime8.db
+  output_log: ${output_root}/optuna-chime8.log  # where optuna log will be stored
   n_trials: 10000  # Number of trials to run with optuna
   n_jobs: -1  # Number of parallel jobs to run, set -1 to use all GPUs
-  speaker_output_dir: ${output_root}  # directory for pre-computed embeddings for diarization
+  speaker_output_dir: ${output_root}/speaker_output  # directory for pre-computed embeddings for diarization
   save_gss_output: False  # whether to save GSS output, use False since GSS outputs are huge
   save_diar_output: False  # set to True if you have a lot of disk space
   save_asr_output: False  # set to True if you have a lot of disk space
@@ -123,12 +122,12 @@ diarizer:
     parameters:
       oracle_num_speakers: False # If True, use num of speakers value provided in manifest file.
       max_num_speakers: ${max_num_spks} # Max number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.
-      min_num_speakers: 2 # Max number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.
+      min_num_speakers: 2 # Min number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.
       enhanced_count_thres: 80 # If the number of segments is lower than this number, enhanced speaker counting is activated.
-      max_rp_threshold: 0.06
+      max_rp_threshold: 0.9
       sparse_search_volume: 25 # The higher the number, the more values will be examined with more time. 
       maj_vote_spk_count: False  # If True, take a majority vote on multiple p-values to estimate the number of speakers.
-      clustering_scale_index: 2 # The index of scale to be used for clustering. 
+      clustering_scale_index: 2 # The index of scale to be used for clustering.
       sync_score_thres: 0.9 # Cascaded clustering threshold for deciding whether to proceed to the finer scale.
       reclus_aff_thres: 0.75 # Affinity threshold for reducing the number of clusters in the re-clustering step. Recommended range is [0.7, 0.9].
       max_mc_ch_num: 5

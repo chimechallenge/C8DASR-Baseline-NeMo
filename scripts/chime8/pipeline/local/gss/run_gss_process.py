@@ -36,7 +36,6 @@ def convert_diar_results_to_falign(scenarios: list, diarization_dir: str, output
     # Output of diarization is organized in 3 subdirectories, with each subdirectory corresponding to one scenario (chime6, dipco, mixer6)
     diar_json_dir = os.path.join(diarization_dir, "pred_jsons_T")
 
-
     # assert len(scenario_dirs) == 3, f'Expected 3 subdirectories, found {len(scenario_dirs)}'
     none_useful_fields = ['audio_filepath', 'words', 'text', 'duration', 'offset']
     for scenario in scenarios:
@@ -219,7 +218,7 @@ def run_gss_process(cfg):
             logging.info("Stage 2: Trim cuts to supervisions (1 cut per supervision)")
             cuts_seg_manifest = str(exp_dir / f"cuts_per_segment.jsonl.gz")
             trim_to_supervisions(
-                cuts=cuts_manifest, output_cuts=cuts_seg_manifest, keep_overlapping=False, 
+                cuts=cuts_manifest, output_cuts=cuts_seg_manifest, keep_overlapping=False,
             )
 
             logging.info("Stage 3: Run GSS and prepare nemo manifests")

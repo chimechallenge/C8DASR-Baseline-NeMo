@@ -20,10 +20,10 @@ from pathlib import Path
 
 import optuna
 import torch
-from asr.run_asr import run_asr
-from diar.run_diar import run_diarization
-from eval.run_chime_eval import run_chime_evaluation
-from gss_process.run_gss_process import run_gss_process
+from local.asr.run_asr import run_asr
+from local.diar.run_diar import run_diarization
+from local.eval.run_chime_eval import run_chime_evaluation
+from local.gss.run_gss_process import run_gss_process
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from nemo.core.config import hydra_runner
@@ -58,6 +58,8 @@ def sample_params(cfg: DictConfig, trial: optuna.Trial):
     cfg.diarizer.clustering.parameters.sparse_search_volume = trial.suggest_int(
         "sparse_search_volume", low=25, high=25, step=1
     )
+    cfg.diarizer.clustering.reclus_aff_thres = trial.suggest_float("reclus_aff_thres", low=0.7, high=0.9, step=0.01)
+
     r_value = round(trial.suggest_float("r_value", 0.5, 2.5, step=0.05), 4)
     scale_n = len(cfg.diarizer.speaker_embeddings.parameters.multiscale_weights)
     cfg.diarizer.speaker_embeddings.parameters.multiscale_weights = scale_weights(r_value, scale_n)

@@ -22,8 +22,8 @@ import numpy as np
 import soundfile as sf
 import torch
 import torchaudio
-from gss.core import Activity
-from gss.utils.data_utils import GssDataset, create_sampler
+from .core.activity import Activity
+from .utils.data_utils import GssDataset, create_sampler
 from lhotse import CutSet, Recording, RecordingSet, SupervisionSegment, SupervisionSet
 from lhotse.utils import add_durations, compute_num_samples
 from torch.utils.data import DataLoader
