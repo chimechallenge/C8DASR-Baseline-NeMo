@@ -59,17 +59,6 @@ preprocess:
 
 
 diarizer:
-  dereverberation: 
-    toggle: True # True or False
-    block_length_sec: 40 # process one block at a time seconds at a time
-    block_overlap_sec: 2 # overlap between blocks, apply averaging
-    fft_length: 1024
-    hop_length: 256
-    dereverb: 
-      filter_length: 10
-      prediction_delay: 3
-      num_iterations: 10
-    use_dtype: torch.cfloat # About 10x faster than torch.cdouble
   use_saved_embeddings: True # True or False
   manifest_filepath: ${diar_base_dir}/diar_manifest.json
   out_dir: ${diar_base_dir}
@@ -77,11 +66,24 @@ diarizer:
   oracle_vad: False # If True, uses RTTM files provided in the manifest file to get speech activity (VAD) timestamps
   collar: 0.25 # Collar value for scoring
   ignore_overlap: False # Consider or ignore overlap segments while scoring
-  
+
+  dereverb:
+    parameters:
+      toggle: True # True or False
+      block_length_sec: 15 # process one block at a time seconds at a time
+      block_overlap_sec: 2 # overlap between blocks, apply averaging
+      fft_length: 1024
+      hop_length: 256
+      dereverb: 
+        filter_length: 10
+        prediction_delay: 3
+        num_iterations: 10
+      use_dtype: torch.cfloat # About 10x faster than torch.cdouble
+
   multichannel:
     parameters:
       mix_count: 3
-      power_p: 2
+      power_p: 4
       channel_selector: null
       multi_channel_mode: 'mc_vad_cc_mixer' # Multichannel model: 'mc_vad', 'mc_vad_cc', 'mc_avg' and 'mc_1st_ch'. Default is "mc_vad"
       mc_max_vad: False
@@ -127,12 +129,14 @@ diarizer:
       maj_vote_spk_count: False  # If True, take a majority vote on multiple p-values to estimate the number of speakers.
       clustering_scale_index: 2 # The index of scale to be used for clustering.
       sync_score_thres: 0.9 # Cascaded clustering threshold for deciding whether to proceed to the finer scale.
+      reclus_aff_thres: 0.75 # Affinity threshold for reducing the number of clusters in the re-clustering step. Recommended range is [0.7, 0.9].
       max_mc_ch_num: 5
       
        
   msdd_model:
     model_path: ${msdd_model_path} # .nemo local model path or pretrained model name for multiscale diarization decoder (MSDD)
     parameters:
+      session_len_sec: 15
       use_speaker_model_from_ckpt: True # If True, use speaker embedding model in checkpoint. If False, the provided speaker embedding model in config will be used.
       infer_batch_size: ${batch_size} # Batch size for MSDD inference.
       sigmoid_threshold: [0.55] # Sigmoid threshold for generating binarized speaker labels. The smaller the more generous on detecting overlaps.
@@ -143,7 +147,6 @@ diarizer:
       global_average_window_count: 190 # The number of windos to calculate global average embedding for both left and right. If 3, 3+3+1 = 7 windows are used.
       overlap_infer_spk_limit: 0.3 # If the proportion of speaking time is lower than this, ignore those speakers for overlap detection.
       msdd_overlap_add: False
-      use_1ch_from_ch_clus: False
       mask_spks_with_clus: True
       ts_vad_threshold: -1 # if negative number, use VAD for clustering diarizer.
       infer_overlap: True
@@ -230,7 +233,7 @@ asr:
     beam:
       ngram_lm_model: ${lm_model_path}
       ngram_lm_alpha: 0.0
-      beam_size: 8 
+      beam_size: 4
       return_best_hypothesis: true
       maes_num_steps: 5
       maes_prefix_alpha: 3
@@ -263,7 +266,7 @@ eval:
   partition: dev
   output_folder: null
   # Whether or not use diarization to re-order the system output, if "set to false we will not re-order 
-  #the system output (you can set to false if you are using oracle diarization)
+  # the system output (you can set to false if you are using oracle diarization)
   diarization: True 
   falign: false  # Path to folder containing forced-alignment rttms. (not used now)
   collar: 500  # Diarization metrics collar in ms. 500ms collar in pyannote is equivalent to 250ms start and end collar in dscore.

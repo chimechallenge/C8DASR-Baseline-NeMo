@@ -448,26 +448,40 @@ def generate_cluster_labels(segment_ranges: List[str], cluster_labels: List[int]
     """
     lines = []
     for idx, label in enumerate(cluster_labels):
-        tag = 'speaker_' + str(label)
+        tag = 'speaker_' + str(int(label))
         stt, end = segment_ranges[idx]
         lines.append(f"{stt} {end} {tag}")
     cont_lines = get_contiguous_stamps(lines)
     diar_hyp = merge_stamps(cont_lines)
     return diar_hyp, lines
                 
-def divide_and_conquer_clustering(ms_silsp_embs, cluster_labels_infer, unit_clus_len, max_num_speakers, base_scale_idx, sync_score_thres=0.75):
+def divide_and_conquer_clustering(
+    ms_silsp_embs: torch.Tensor,
+    cluster_labels_infer: torch.Tensor,
+    unit_clus_len: int,
+    max_num_speakers: int,
+    base_scale_idx: int,
+    sync_score_thres: float=0.75):
     """
     For long form audio files, perform divide and conquer clustering to get fine-grained speaker labels.
 
     Args:
-        ms_silsp_embs (_type_): _description_
-        cluster_labels_infer (_type_): _description_
-        unit_clus_len (_type_): _description_
-        base_scale_idx (_type_): _description_
-        sync_score_thres (float, optional): _description_. Defaults to 0.75.
+        ms_silsp_embs (torch.Tensor):
+            The multi-scale embeddings of the audio file.
+        cluster_labels_infer (torch.Tensor):
+            The cluster labels of the audio file.
+        unit_clus_len (int):
+            The length of each unit cluster.
+        max_num_speakers (int):
+            The maximum number of speakers.
+        base_scale_idx (int):
+            The base scale index which is the highest scale index.
+        sync_score_thres (float, optional):
+            The synchronization score threshold. Defaults to 0.75.
 
     Returns:
-        _type_: _description_
+        fine_grained_labels (torch.Tensor):
+            The fine-grained speaker labels.
     """
     fine_grained_scale_idx = min(ms_silsp_embs.shape[1]-1, base_scale_idx+1)
     cluster_labels_infer  = cluster_labels_infer.cuda()
@@ -501,7 +515,6 @@ def divide_and_conquer_clustering(ms_silsp_embs, cluster_labels_infer, unit_clus
         logging.info(f"[Speaker Clustering] Fine grained label sync score: [{sync_score:.4f} , offset: {offset} sync_score_thres: {sync_score_thres:.3f}]")
         if sync_score < sync_score_thres:
             new_label_index = clus_label_vad + offset
-        
         total_fine_grained_labels.append(new_label_index)
     
     vad_fine_grained_labels = torch.cat(total_fine_grained_labels, dim=0).to(cluster_labels_infer.device)
@@ -620,8 +633,8 @@ def get_scaled_drop_length_thres(
     return int((multiscale_dict[clustering_scale_index][0]/multiscale_dict[base_scale_idx][0]) * drop_length_thres)
 
 def get_selected_channel_embs(
-    ms_emb_seq, 
-    max_mc_ch_num, 
+    ms_emb_seq: torch.Tensor, 
+    max_mc_ch_num: int, 
     collapse_scale_dim: bool =False,
     multiscale_weights: list =[], 
     ):
@@ -650,12 +663,29 @@ def get_selected_channel_embs(
         merged_mono_scale_embs = ms_emb_seq_weighted.sum(dim=1)
     else:
         merged_mono_scale_embs = ms_emb_seq.reshape(ms_emb_seq.shape[0], -1, ms_emb_seq.shape[-1]) # [T, scale_n, emb_dim, ch] -> [T, scale_n * emb_dim, ch]
+
+    if merged_mono_scale_embs.shape[-1] < max_mc_ch_num:
+        # If the # of channels is less than the max_mc_ch_num, repeat the last channel
+        delta_dim = min(max_mc_ch_num - merged_mono_scale_embs.shape[-1], merged_mono_scale_embs.shape[-1])
+        merged_mono_scale_embs = torch.cat([merged_mono_scale_embs, merged_mono_scale_embs[:, :, :delta_dim]], dim=-1)
     t_embs  = merged_mono_scale_embs.transpose(1, 2) # [T, ch, emb_dim]
     ch_sim = cos_similarity_batch(emb_a=t_embs.float(), emb_b=t_embs.float())  # [T, ch, ch]
     ch_sim_T = ch_sim.mean(dim=1)
+    only_pos = ch_sim_T.sum(dim=0) > 0
     arg_sort_inds = torch.sort(ch_sim_T, descending=True)[1]
+
+    # Remove the silent channels (Added Feb/13th/2024)
+    if only_pos.sum() == 0:
+        raise ValueError("All channels are silent (only_pos.sum() == 0). Cannot perform speaker diarization. Aborting.")
+    elif only_pos.sum() < only_pos.shape[0]: 
+        rep_count = int(only_pos.sum())
+        arg_sort_inds_op = arg_sort_inds[:,only_pos]
+        total_rep = np.ceil(only_pos.shape[0]/rep_count).astype(int)
+        arg_sort_inds = arg_sort_inds_op.repeat(1, total_rep)[:,:only_pos.shape[0]]
     if arg_sort_inds.shape[1] > max_mc_ch_num:
         arg_sort_inds = arg_sort_inds[:, :max_mc_ch_num]
+
+    # Now, `arg_sort_inds` is always [T, max_mc_ch_num] shape.
     sorted_ch_inds = torch.sort(arg_sort_inds, dim=1, descending=True)[0]
     merged_mono_scale_embs_list = []
     for tdx in range(sorted_ch_inds.shape[0]):
@@ -685,16 +715,15 @@ def perform_clustering_embs(
     long_audio_thres: int = 100000,
     unit_clus_len: int = 1000,
     get_rttm_with_the_finest_scale: bool = True,
+    cuda: bool = True,
 ):
     if len(embeddings_dict) == 0:
         raise ValueError("Empty embeddings_dict.")
     if len(time_stamps_dict) == 0:
         raise ValueError("Empty time_stamps_dict.")
     uniq_clus_labels_dict = {}
-    cuda = True
-    all_hypothesis, all_reference = [], []
+    lines_cluster_labels, all_hypothesis, all_reference = [], [], []
     no_references = False
-    lines_cluster_labels = []
     base_scale_idx = clustering_params.clustering_scale_index
     max_mc_ch_num = clustering_params.max_mc_ch_num 
     if device.type != 'cuda':
@@ -706,11 +735,11 @@ def perform_clustering_embs(
     for uniq_id, audio_rttm_values in tqdm(AUDIO_RTTM_MAP.items(), desc='clustering', leave=True, disable=not verbose):
         scale_map = scale_mapping_dict[uniq_id]
             
-        if len(embeddings_dict[uniq_id].shape) > 3:
-            # The last dimension is the channel dimension
+        # The last dimension is the channel dimension
+        if len(embeddings_dict[uniq_id].shape) > 3: # If multi-channel case
             embeddings = embeddings_dict[uniq_id]
             time_stamps = time_stamps_dict[uniq_id][:, :, :, 0]
-        else:
+        else: # Single channel case
             embeddings = embeddings_dict[uniq_id]
             time_stamps = time_stamps_dict[uniq_id]
         
@@ -719,11 +748,9 @@ def perform_clustering_embs(
             if verbose:
                 logging.info(f"[Speaker Clustering] Long form audio detected: Using {base_scale_idx}-index scale length {multiscale_dict[base_scale_idx]} Segment Count - {scale_map.shape[1]}")
             base_scale_idx = max(0, base_scale_idx - 1)
-            use_fine_grained_clustering = False
         else:
             if verbose:
                 logging.info(f"[Speaker Clustering] Short form audio detected: Segment Count - {scale_map.shape[1]}")
-            use_fine_grained_clustering = False
         
         ms_silsp_embs, ms_embs_scaled_vadmasked, ms_ts_scaled, vad_decision_scaled, vad_decision_base = get_ms_embs_and_ts(base_scale_idx, 
                                                                                                                            embeddings, 
@@ -763,6 +790,7 @@ def perform_clustering_embs(
                 max_rp_threshold=float(clustering_params.max_rp_threshold),
                 sparse_search_volume=int(clustering_params.sparse_search_volume),
                 drop_length_thres=drop_length_thres_scaled,
+                reclus_aff_thres=float(clustering_params.get('reclus_aff_thres', 0.85)),
             )
         
         cluster_labels_infer, max_scm = get_cluster_labels_infer(ms_silsp_embs, 
@@ -771,25 +799,12 @@ def perform_clustering_embs(
                                                                  vad_decision_base, 
                                                                  scale_map, 
                                                                  base_scale_idx)
-            
-        # Mask non-speech again with the finest scale resolution.
-        if use_fine_grained_clustering:
-            logging.info(f"Using fine grained clustering on embedding shape : {embeddings_dict[uniq_id].shape} and unit_clus_len: {unit_clus_len}")
-            cluster_base_labels = divide_and_conquer_clustering(embeddings, 
-                                                                cluster_labels_infer, 
-                                                                unit_clus_len=unit_clus_len, 
-                                                                max_num_speakers=int(clustering_params.max_num_speakers),
-                                                                base_scale_idx=base_scale_idx, 
-                                                                sync_score_thres=clustering_params.sync_score_thres)
-            cluster_labels_infer = cluster_base_labels.cpu()
-        
         if cuda:
             torch.cuda.empty_cache()
         else:
             gc.collect()
 
         uniq_clus_labels_dict[uniq_id] = cluster_labels_infer
-       
         del ms_embs_scaled_vadmasked, ms_silsp_embs, selected_ss_mc_embs, ms_ts_scaled, vad_decision_scaled, vad_decision_base
         if get_rttm_with_the_finest_scale: 
             timestamps = time_stamps[-1][:max_scm][cluster_labels_infer != -1]/feat_per_sec
@@ -809,7 +824,6 @@ def perform_clustering_embs(
         rttm_file = audio_rttm_values.get('rttm_filepath', None)
         if rttm_file is not None and os.path.exists(rttm_file) and not no_references:
             ref_labels = rttm_to_labels(rttm_file)
-            # ref_labels = get_partial_ref_labels(pred_labels=labels, ref_labels=ref_labels)
             reference = labels_to_pyannote_object(ref_labels, uniq_name=uniq_id)
             all_reference.append([uniq_id, reference])
         else:

@@ -36,7 +36,6 @@ def convert_diar_results_to_falign(scenarios: list, diarization_dir: str, output
     # Output of diarization is organized in 3 subdirectories, with each subdirectory corresponding to one scenario (chime6, dipco, mixer6)
     diar_json_dir = os.path.join(diarization_dir, "pred_jsons_T")
 
-
     # assert len(scenario_dirs) == 3, f'Expected 3 subdirectories, found {len(scenario_dirs)}'
     none_useful_fields = ['audio_filepath', 'words', 'text', 'duration', 'offset']
     for scenario in scenarios:
@@ -46,11 +45,7 @@ def convert_diar_results_to_falign(scenarios: list, diarization_dir: str, output
             manifests = glob.glob(diar_json_dir + f'/{scenario}-{subset}*')
 
             if len(manifests) == 0:
-                print(f'No subdirectory found for {scenario} and {subset}')
-                import ipdb
-
-                ipdb.set_trace()
-                continue
+                raise ValueError(f'No subdirectory found for {scenario} and {subset}')
 
             # Process each manifest
             for manifest in manifests:
@@ -58,12 +53,12 @@ def convert_diar_results_to_falign(scenarios: list, diarization_dir: str, output
                 session_name = (
                     manifest_name.replace(scenario, '')
                     .replace('dev', '')
+                    .replace('train', '')
                     .replace('eval', '')
                     .replace('.json', '')
                     .strip('-')
                 )
                 new_manifest = os.path.join(output_dir, scenario, subset, session_name + '.json')
-
                 if not os.path.isdir(os.path.dirname(new_manifest)):
                     os.makedirs(os.path.dirname(new_manifest))
 
@@ -109,6 +104,8 @@ def prepare_nemo_manifests(data_dir: str, audio_type: str = 'flac'):
         raise ValueError(f'Unknown subset: both dev and eval are in {data_dir}')
     elif 'dev' in data_dir:
         subset = 'dev'
+    elif 'train' in data_dir:
+        subset = 'train'
     elif 'eval' in data_dir:
         subset = 'eval'
     else:
@@ -221,7 +218,7 @@ def run_gss_process(cfg):
             logging.info("Stage 2: Trim cuts to supervisions (1 cut per supervision)")
             cuts_seg_manifest = str(exp_dir / f"cuts_per_segment.jsonl.gz")
             trim_to_supervisions(
-                cuts=cuts_manifest, output_cuts=cuts_seg_manifest, keep_overlapping=False, 
+                cuts=cuts_manifest, output_cuts=cuts_seg_manifest, keep_overlapping=False,
             )
 
             logging.info("Stage 3: Run GSS and prepare nemo manifests")

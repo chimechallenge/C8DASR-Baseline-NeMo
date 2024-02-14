@@ -83,12 +83,14 @@ def choose_txt_normalization(scoring_txt_normalization="chime7"):
         raise NotImplementedError("scoring text normalization should be either 'chime7' or 'chime6'")
     return scoring_txt_normalization
 
+
 def _get_channel(session, subset, mic, recordings):
     if mic == "ihm":
         return [0, 1] if subset == "train" else [0]
     else:
         recording = recordings[session]
         return list(range(recording.num_channels))
+
 
 def create_manifest_dict(recordings, supervisions, dataset_name, mic, subset, output_dir):
     manifests = defaultdict(dict)
@@ -104,6 +106,7 @@ def create_manifest_dict(recordings, supervisions, dataset_name, mic, subset, ou
     }
     return manifests
 
+
 def set_segment_variables(session, subset, dataset_name, recordings, idx, segment, mic):
     spk_id = segment["speaker"]
     channel = _get_channel(session, subset, mic, recordings)
@@ -111,6 +114,7 @@ def set_segment_variables(session, subset, dataset_name, recordings, idx, segmen
     end = float(segment["end_time"])
     ex_id = f"{spk_id}_{dataset_name}_{session}_{idx}-" f"{round(100 * start):06d}_{round(100 * end):06d}-{mic}"
     return spk_id, channel, start, end, ex_id, segment
+
 
 def prepare_chime6(
     corpus_dir: Pathlike,
@@ -201,7 +205,9 @@ def prepare_chime6(
         with open(os.path.join(transcriptions_dir, subset, f"{session}.json")) as f:
             transcript = json.load(f)
             for idx, segment in enumerate(transcript):
-                spk_id, channel, start, end, ex_id, segment = set_segment_variables(session, subset, dataset_name, recordings, idx, segment, mic)
+                spk_id, channel, start, end, ex_id, segment = set_segment_variables(
+                    session, subset, dataset_name, recordings, idx, segment, mic
+                )
                 if ignore_shorter is not None and (end - start) < ignore_shorter:
                     print(
                         "Ignored segment session {} speaker "
@@ -274,7 +280,11 @@ def prepare_notsofar1(
         for idx, audio_path in enumerate(sorted(audio_paths)):
             sources.append(AudioSource(type="file", channels=[idx], source=str(audio_path)))
 
-        audio_sf = sf.SoundFile(str(audio_paths[0]))
+        try:
+            audio_sf = sf.SoundFile(str(audio_paths[0]))
+        except:
+            raise FileNotFoundError(f"No audio found for session {session} in {subset} set.")
+
         recordings.append(
             Recording(
                 id=session,
@@ -291,7 +301,9 @@ def prepare_notsofar1(
         with open(os.path.join(transcriptions_dir, subset, f"{session}.json")) as f:
             transcript = json.load(f)
             for idx, segment in enumerate(transcript):
-                spk_id, channel, start, end, ex_id, segment = set_segment_variables(session, subset, dataset_name, recordings, idx, segment, mic)
+                spk_id, channel, start, end, ex_id, segment = set_segment_variables(
+                    session, subset, dataset_name, recordings, idx, segment, mic
+                )
                 if ignore_shorter is not None and (end - start) < ignore_shorter:
                     print(
                         "Ignored segment session {} speaker "
@@ -548,7 +560,10 @@ def prepare_mixer6(
                 rec_id = f"{sess}-{subset}-{mic}"
                 channel = list(range(len(current_sess_audio)))
 
-            ex_id = f"{spk_id}_{dataset_name}_{sess}_{subset}_{idx}-" f"{round(100 * start):06d}_{round(100 * end):06d}-{mic}"
+            ex_id = (
+                f"{spk_id}_{dataset_name}_{sess}_{subset}_{idx}-"
+                f"{round(100 * start):06d}_{round(100 * end):06d}-{mic}"
+            )
             if "words" not in segment.keys():
                 assert json_dir is not None
                 segment["words"] = "placeholder"
@@ -636,9 +651,9 @@ def prepare_chime_manifests(
             )
         elif scenario == "notsofar1":
             prepare_notsofar1(
-                os.path.join(data_root, scenario),
-                os.path.join(output_root, scenario, subset),
-                subset,
+                corpus_dir=os.path.join(data_root, scenario),
+                output_dir=os.path.join(output_root, scenario, subset),
+                subset=subset,
                 mic=mic,
                 ignore_shorter=ignore_shorter,
                 json_dir=os.path.join(diarization_json_dir, scenario),
