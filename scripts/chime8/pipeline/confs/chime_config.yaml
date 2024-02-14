@@ -46,7 +46,7 @@ optuna:
   output_log: ${output_root}/optuna-chime8.log  # where optuna log will be stored
   n_trials: 10000  # Number of trials to run with optuna
   n_jobs: -1  # Number of parallel jobs to run, set -1 to use all GPUs
-  speaker_output_dir: ${output_root}  # directory for pre-computed embeddings for diarization
+  speaker_output_dir: ${output_root}/speaker_output  # directory for pre-computed embeddings for diarization
   save_gss_output: False  # whether to save GSS output, use False since GSS outputs are huge
   save_diar_output: False  # set to True if you have a lot of disk space
   save_asr_output: False  # set to True if you have a lot of disk space
@@ -118,7 +118,6 @@ diarizer:
   
   clustering:
     parameters:
-      frame_vad_threshold: 0.8 #${frame_vad_threshold}
       oracle_num_speakers: False # If True, use num of speakers value provided in manifest file.
       max_num_speakers: ${max_num_spks} # Max number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.
       min_num_speakers: 2 # Min number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.

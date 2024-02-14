@@ -41,5 +41,4 @@ CUDA_VISIBLE_DEVICES=1 python ${SCRIPT_NAME} --config-path="${CONFIG_PATH}" --co
     asr_model_path=${ASR_MODEL_PATH} \
     lm_model_path=${LM_MODEL_PATH} \
     diarizer.use_saved_embeddings=true \
-    diarizer.manifest_filepath=${DIAR_MANIFEST_FILEPATH} \
-    optuna.speaker_output_dir=${SPEAKER_OUTPUT_DIR}
+    diarizer.manifest_filepath=${DIAR_MANIFEST_FILEPATH}

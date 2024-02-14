@@ -20,10 +20,10 @@ from pathlib import Path
 
 import optuna
 import torch
-from asr.run_asr import run_asr
-from diar.run_diar import run_diarization
-from eval.run_chime_eval import run_chime_evaluation
-from gss_process.run_gss_process import run_gss_process
+from local.asr.run_asr import run_asr
+from local.diar.run_diar import run_diarization
+from local.eval.run_chime_eval import run_chime_evaluation
+from local.gss.run_gss_process import run_gss_process
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from nemo.core.config import hydra_runner
