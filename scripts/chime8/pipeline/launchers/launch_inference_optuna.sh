@@ -19,7 +19,7 @@ MSDD_MODEL_PATH=${CHECKPOINTS_DIR}/msdd_v2_PALO_bs6_a003_version6_e53.ckpt
 SCENARIOS="[mixer6]"
 SUBSETS="[dev]"  # can only optimize one subset
 
-SCRIPT_NAME=${NEMO_ROOT}/scripts/chime7/pipeline/inference_optuna.py
+SCRIPT_NAME=${NEMO_ROOT}/scripts/chime7/pipeline/tuna_all.py
 CONFIG_PATH=${NEMO_ROOT}/scripts/chime7/pipeline
 YAML_NAME="chime_config.yaml"
 
