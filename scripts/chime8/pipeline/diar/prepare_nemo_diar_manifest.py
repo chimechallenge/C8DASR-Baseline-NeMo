@@ -148,9 +148,7 @@ def create_multichannel_manifest(
             try:
                 duration = sox.file_info.duration(audio_line)
             except:
-                import ipdb
-
-                ipdb.set_trace()
+                raise ValueError(f"Failed to get duration for {audio_line}. Check the file {audio_line} exists.")
             audio_duration_list.append(duration)
         min_duration, max_duration = min(audio_duration_list), max(audio_duration_list)
         if min_duration < (uem_abs_end - uem_abs_stt):
@@ -283,6 +281,7 @@ def get_mc_audio_filepaths(multichannel_audio_files: str, dataset: str, dataset_
     mc_audio_to_list_of_sc_files = dict()
     for mc_audio_file in multichannel_audio_files:
         logging.info('Preparing list of single-channel audio files: %s', mc_audio_file)
+        split = mc_audio_file.split("/")[1] 
 
         # drop the absolute
         filepath_base, _ = os.path.splitext(mc_audio_file)
@@ -290,7 +289,7 @@ def get_mc_audio_filepaths(multichannel_audio_files: str, dataset: str, dataset_
         if dataset in ['chime6', 'dipco']: 
             file_ext = '_U??.CH?.wav'
         elif dataset in  ['notsofar1']:
-            file_ext = '_U??_CH?.wav'
+            file_ext = '_U??.CH?.wav'
         elif dataset in ['mixer6']:
             file_ext = '_CH??.wav'
 
@@ -356,13 +355,11 @@ def generate_annotations(
     total_data_stats = {}
 
     if subset == 'dev':
-        # scenarios = ['chime6', 'dipco', 'mixer6']
         scenarios = ['chime6', 'dipco', 'mixer6', 'notsofar1']
-        # scenarios = ['mixer6']
     elif subset == 'eval':
-        scenarios = ['chime6', 'dipco', 'mixer6']
+        scenarios = ['chime6', 'dipco', 'mixer6', 'notsofar1']
     elif subset == 'train':
-        scenarios = ['chime6']
+        scenarios = ['chime6', 'dipco', 'mixer6', 'notsofar1']
     elif subset in ['train_intv', 'train_call']:
         scenarios = ['mixer6']
 

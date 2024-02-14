@@ -620,8 +620,8 @@ def get_scaled_drop_length_thres(
     return int((multiscale_dict[clustering_scale_index][0]/multiscale_dict[base_scale_idx][0]) * drop_length_thres)
 
 def get_selected_channel_embs(
-    ms_emb_seq, 
-    max_mc_ch_num, 
+    ms_emb_seq: torch.Tensor, 
+    max_mc_ch_num: int, 
     collapse_scale_dim: bool =False,
     multiscale_weights: list =[], 
     ):
@@ -650,12 +650,29 @@ def get_selected_channel_embs(
         merged_mono_scale_embs = ms_emb_seq_weighted.sum(dim=1)
     else:
         merged_mono_scale_embs = ms_emb_seq.reshape(ms_emb_seq.shape[0], -1, ms_emb_seq.shape[-1]) # [T, scale_n, emb_dim, ch] -> [T, scale_n * emb_dim, ch]
+
+    if merged_mono_scale_embs.shape[-1] < max_mc_ch_num:
+        # If the # of channels is less than the max_mc_ch_num, repeat the last channel
+        delta_dim = min(max_mc_ch_num - merged_mono_scale_embs.shape[-1], merged_mono_scale_embs.shape[-1])
+        merged_mono_scale_embs = torch.cat([merged_mono_scale_embs, merged_mono_scale_embs[:, :, :delta_dim]], dim=-1)
     t_embs  = merged_mono_scale_embs.transpose(1, 2) # [T, ch, emb_dim]
     ch_sim = cos_similarity_batch(emb_a=t_embs.float(), emb_b=t_embs.float())  # [T, ch, ch]
     ch_sim_T = ch_sim.mean(dim=1)
+    only_pos = ch_sim_T.sum(dim=0) > 0
     arg_sort_inds = torch.sort(ch_sim_T, descending=True)[1]
+
+    # Remove the silent channels (Added Feb/13th/2024)
+    if only_pos.sum() == 0:
+        raise ValueError("All channels are silent (only_pos.sum() == 0). Cannot perform speaker diarization. Aborting.")
+    elif only_pos.sum() < only_pos.shape[0]: 
+        rep_count = int(only_pos.sum())
+        arg_sort_inds_op = arg_sort_inds[:,only_pos]
+        total_rep = np.ceil(only_pos.shape[0]/rep_count).astype(int)
+        arg_sort_inds = arg_sort_inds_op.repeat(1, total_rep)[:,:only_pos.shape[0]]
     if arg_sort_inds.shape[1] > max_mc_ch_num:
         arg_sort_inds = arg_sort_inds[:, :max_mc_ch_num]
+
+    # Now, `arg_sort_inds` is always [T, max_mc_ch_num] shape.
     sorted_ch_inds = torch.sort(arg_sort_inds, dim=1, descending=True)[0]
     merged_mono_scale_embs_list = []
     for tdx in range(sorted_ch_inds.shape[0]):

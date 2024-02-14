@@ -274,7 +274,11 @@ def prepare_notsofar1(
         for idx, audio_path in enumerate(sorted(audio_paths)):
             sources.append(AudioSource(type="file", channels=[idx], source=str(audio_path)))
 
-        audio_sf = sf.SoundFile(str(audio_paths[0]))
+        try:
+            audio_sf = sf.SoundFile(str(audio_paths[0]))
+        except:
+            raise FileNotFoundError(f"No audio found for session {session} in {subset} set.")
+
         recordings.append(
             Recording(
                 id=session,
@@ -636,9 +640,9 @@ def prepare_chime_manifests(
             )
         elif scenario == "notsofar1":
             prepare_notsofar1(
-                os.path.join(data_root, scenario),
-                os.path.join(output_root, scenario, subset),
-                subset,
+                corpus_dir=os.path.join(data_root, scenario),
+                output_dir=os.path.join(output_root, scenario, subset),
+                subset=subset,
                 mic=mic,
                 ignore_shorter=ignore_shorter,
                 json_dir=os.path.join(diarization_json_dir, scenario),

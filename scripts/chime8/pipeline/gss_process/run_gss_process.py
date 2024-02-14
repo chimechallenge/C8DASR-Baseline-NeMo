@@ -46,11 +46,7 @@ def convert_diar_results_to_falign(scenarios: list, diarization_dir: str, output
             manifests = glob.glob(diar_json_dir + f'/{scenario}-{subset}*')
 
             if len(manifests) == 0:
-                print(f'No subdirectory found for {scenario} and {subset}')
-                import ipdb
-
-                ipdb.set_trace()
-                continue
+                raise ValueError(f'No subdirectory found for {scenario} and {subset}')
 
             # Process each manifest
             for manifest in manifests:
@@ -58,12 +54,12 @@ def convert_diar_results_to_falign(scenarios: list, diarization_dir: str, output
                 session_name = (
                     manifest_name.replace(scenario, '')
                     .replace('dev', '')
+                    .replace('train', '')
                     .replace('eval', '')
                     .replace('.json', '')
                     .strip('-')
                 )
                 new_manifest = os.path.join(output_dir, scenario, subset, session_name + '.json')
-
                 if not os.path.isdir(os.path.dirname(new_manifest)):
                     os.makedirs(os.path.dirname(new_manifest))
 
@@ -109,6 +105,8 @@ def prepare_nemo_manifests(data_dir: str, audio_type: str = 'flac'):
         raise ValueError(f'Unknown subset: both dev and eval are in {data_dir}')
     elif 'dev' in data_dir:
         subset = 'dev'
+    elif 'train' in data_dir:
+        subset = 'train'
     elif 'eval' in data_dir:
         subset = 'eval'
     else:
