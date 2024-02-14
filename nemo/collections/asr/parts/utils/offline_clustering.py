@@ -100,9 +100,9 @@ def drop_and_recluster(
     drop_length_thres: int,
     n_clusters: int,
     cuda: bool,
-    reclus_thres: float = 0.85,
-    method: str = 'spectral',
+    reclus_aff_thres: float = 0.72,
     max_aff: float = 1.0,
+    n_random_trials: int = 25,
 ) -> Tuple[torch.Tensor, int]:
     """
     Drop the number of speakers and re-cluster the embeddings if the max affinity is too high.
@@ -122,8 +122,8 @@ def drop_and_recluster(
             The estimated number of speakers.
         cuda (bool):
             Boolean variable to check whether the current device is CUDA or not.
-        reclus_thres (float):
-            The threshold for re-clustering.
+        reclus_aff_thres (float):
+            The affinity value threshold for re-clustering.
         method (str):
             The method that is used for re-clustering. The default method is 'spectral'.
         max_aff (float):
@@ -138,50 +138,33 @@ def drop_and_recluster(
     if embs.shape[0] < drop_length_thres:
         logging.info(f"[Speaker Counting] Short form drop_and_cluster: argument - Detected n_clusters: {n_clusters} embs.shape: {embs.shape} drop_length_thres: {drop_length_thres}")
         spectral_model = SpectralClustering(
-            n_clusters=n_clusters, n_random_trials=30, cuda=cuda, device=embs.device
+            n_clusters=n_clusters, n_random_trials=n_random_trials, cuda=cuda, device=embs.device
         )
         Y = spectral_model.forward(affinity_mat)
         return Y, n_clusters 
     else:
         running_num_of_spks = max_num_speakers 
         # Run re-clustering if the max affinity is too high
-        logging.info(f"[Speaker Counting] Long form drop_and_cluster: Detected n_clusters: {n_clusters} embs.shape: {embs.shape} drop_length_thres: {drop_length_thres}")
-        while max_aff > reclus_thres and running_num_of_spks >= min_num_speakers and embs.shape[0] >= drop_length_thres:
-            if method == 'spectral':
-                spectral_model = SpectralClustering(
-                    n_clusters=running_num_of_spks, n_random_trials=30, cuda=cuda, device=embs.device
-                )
-                Y = spectral_model.forward(affinity_mat)
-            elif method.startswith('ahc'):
-                ahc_model = AHC(distance_threshold=None, 
-                                n_clusters=running_num_of_spks, 
-                                affinity='cosine', 
-                                linkage='average')
-                ahc_model.fit(embs)
-                Y = ahc_model.labels_
-                Y = torch.tensor(Y)
-                embs = torch.tensor(embs)
-            
-            embs = embs.float()
+        logging.info(f"[Speaker Counting] Long form drop_and_cluster: Detected n_clusters: {running_num_of_spks} embs.shape: {embs.shape} drop_length_thres: {drop_length_thres}")
+        while max_aff > reclus_aff_thres and running_num_of_spks >= min_num_speakers and embs.shape[0] >= drop_length_thres:
+            spectral_model = SpectralClustering(
+                n_clusters=running_num_of_spks, n_random_trials=n_random_trials, cuda=cuda, device=embs.device
+            )
+            Y = spectral_model.forward(affinity_mat)
             emb_means= []
             for spk in set(Y.cpu().numpy()):
-                emb_means.append(torch.mean(embs[Y==spk], dim=0))
+                emb_means.append(torch.mean(embs[Y==spk].float(), dim=0))
             if len(emb_means) == 1:
                 return Y, n_clusters
             stacked = torch.stack(emb_means)
-            spk_aff = cos_similarity(emb_a=stacked, emb_b=stacked)
-            spk_aff_org = spk_aff.clone()
-            spk_aff_org.fill_diagonal_(0)
-            spk_aff_org_flat = spk_aff_org.flatten()
-            
-            non_diag_spk_aff = spk_aff_org_flat[spk_aff_org_flat > 0.0]
-            sorted_aff, _ = non_diag_spk_aff.flatten().sort()
-            max_aff = sorted_aff[-1].item()
-            logging.info(f"[Speaker Counting] max affinity: {max_aff:.4f},\n[Speaker Counting] reclus_thres: {reclus_thres:.3f}\n[Speaker Counting] running_num_of_spks: {torch.max(Y)+1}\n[Speaker Counting] sorted aff: {sorted_aff}")
+            spk_aff_org_flat = cos_similarity(emb_a=stacked, emb_b=stacked).fill_diagonal_(0).flatten()
+            sorted_aff, _ = spk_aff_org_flat[spk_aff_org_flat > 0.0].flatten().sort()
+            min_aff, max_aff = sorted_aff[0].item(), sorted_aff[-1].item()
+            logging.info(f"[Speaker Counting] [min, max] affinity [{min_aff:.3f},{max_aff:.3f}],\n[Speaker Counting] reclus_aff_thres: {reclus_aff_thres:.3f}\n[Speaker Counting] running_num_of_spks: {torch.max(Y)+1}")
             running_num_of_spks -= 1
         n_clusters = Y.cpu().numpy().max() + 1
         logging.info(f"[Speaker Counting] Final n_clusters: {n_clusters}")
-        return Y, n_clusters
+    return Y, n_clusters
 
 def ScalerMinMax(X: torch.Tensor) -> torch.Tensor:
     """
@@ -1669,8 +1652,8 @@ class SpeakerClustering(torch.nn.Module):
         kmeans_random_trials: int = 1,
         nme_mat_size: int = 512,
         drop_length_thres: int = 4800,
-        base_scale_idx: int = 2,
         maj_vote_spk_count: bool = True,
+        reclus_aff_thres: float = 0.85,
         use_drop_and_recluster: bool = True,
     ) -> torch.LongTensor:
 
@@ -1712,16 +1695,17 @@ class SpeakerClustering(torch.nn.Module):
             n_clusters = int(oracle_num_speakers)
         else:
             n_clusters = int(est_num_of_spk.item())
-            
+        
         if use_drop_and_recluster:
-            Y, n_clusters = drop_and_recluster(embs, 
-                                            affinity_mat, 
-                                            min_num_speakers, 
-                                            max_num_speakers, 
-                                            drop_length_thres, 
-                                            n_clusters, 
-                                            cuda=self.cuda, 
-                                            method='spectral')
+            Y, n_clusters = drop_and_recluster(embs=embs, 
+                                            affinity_mat=affinity_mat, 
+                                            min_num_speakers=min_num_speakers, 
+                                            max_num_speakers=max_num_speakers, 
+                                            drop_length_thres=drop_length_thres, 
+                                            n_clusters=n_clusters, 
+                                            reclus_aff_thres=reclus_aff_thres,
+                                            cuda=self.cuda
+                                            )
         else:
             spectral_model = SpectralClustering(
                 n_clusters=n_clusters, n_random_trials=kmeans_random_trials, cuda=self.cuda, device=embs.device

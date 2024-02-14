@@ -286,9 +286,7 @@ def get_mc_audio_filepaths(multichannel_audio_files: str, dataset: str, dataset_
         # drop the absolute
         filepath_base, _ = os.path.splitext(mc_audio_file)
 
-        if dataset in ['chime6', 'dipco']: 
-            file_ext = '_U??.CH?.wav'
-        elif dataset in  ['notsofar1']:
+        if dataset in ['chime6', 'dipco', 'notsofar1']: 
             file_ext = '_U??.CH?.wav'
         elif dataset in ['mixer6']:
             file_ext = '_CH??.wav'
