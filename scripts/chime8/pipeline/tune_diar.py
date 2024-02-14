@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import glob
 import logging
 import os
 import time
@@ -22,9 +23,8 @@ import optuna
 import torch
 from local.diar.run_diar import run_diarization
 from omegaconf import DictConfig, ListConfig, OmegaConf
-import glob
-from pyannote.metrics.diarization import DiarizationErrorRate
 from pyannote.database.util import load_rttm
+from pyannote.metrics.diarization import DiarizationErrorRate
 
 from nemo.core.config import hydra_runner
 
@@ -34,8 +34,7 @@ def sample_params(cfg: DictConfig, trial: optuna.Trial):
         return [r - kvar * (r - 1) / (K - 1) for kvar in range(K)]
 
     # Diarization Optimization
-    #cfg.diarizer.oracle_vad = True
-    """
+    cfg.diarizer.oracle_vad = False
     cfg.diarizer.vad.parameters.frame_vad_threshold = trial.suggest_float("frame_vad_threshold", 0.15, 0.7, step=0.02)
     cfg.diarizer.vad.parameters.pad_onset = round(trial.suggest_float("pad_onset", 0.0, 0.2, step=0.01), 2)
     cfg.diarizer.vad.parameters.pad_offset = round(trial.suggest_float("pad_offset", 0.0, 0.2, step=0.01), 2)
@@ -43,16 +42,14 @@ def sample_params(cfg: DictConfig, trial: optuna.Trial):
     cfg.diarizer.vad.parameters.min_duration_off = round(
         trial.suggest_float("min_duration_off", 0.5, 0.95, step=0.05), 2
     )
-    """
-    #cfg.diarizer.msdd_model.parameters.sigmoid_threshold = [0.55]
-    #cfg.diarizer.msdd_model.parameters.global_average_mix_ratio = trial.suggest_float(
-    #    "global_average_mix_ratio", low=0.1, high=0.95, step=0.05
-    #)
-    #cfg.diarizer.msdd_model.parameters.global_average_window_count = trial.suggest_int(
-    #    "global_average_window_count", low=10, high=500, step=20
-    #)
+    cfg.diarizer.msdd_model.parameters.sigmoid_threshold = [0.55]
+    cfg.diarizer.msdd_model.parameters.global_average_mix_ratio = trial.suggest_float(
+        "global_average_mix_ratio", low=0.1, high=0.95, step=0.05
+    )
+    cfg.diarizer.msdd_model.parameters.global_average_window_count = trial.suggest_int(
+        "global_average_window_count", low=10, high=500, step=20
+    )
 
-    cfg.diarizer.clustering.parameters.frame_vad_threshold = trial.suggest_float("clust_frame_vad_threshold", 0.15, 0.7, step=0.02)
     cfg.diarizer.clustering.parameters.oracle_num_speakers = False
     cfg.diarizer.clustering.parameters.max_rp_threshold = round(
         trial.suggest_float("max_rp_threshold", low=0.03, high=0.1, step=0.01), 2
@@ -62,11 +59,12 @@ def sample_params(cfg: DictConfig, trial: optuna.Trial):
     )
     cfg.diarizer.clustering.parameters.sync_score_thres = trial.suggest_float("sync_score_thres", 0.4, 0.95, step=0.02)
 
-   # r_value = round(trial.suggest_float("r_value", 0.5, 2.5, step=0.05), 4)
-    #scale_n = len(cfg.diarizer.speaker_embeddings.parameters.multiscale_weights)
-   # cfg.diarizer.speaker_embeddings.parameters.multiscale_weights = scale_weights(r_value, scale_n)
+    r_value = round(trial.suggest_float("r_value", 0.5, 2.5, step=0.05), 4)
+    scale_n = len(cfg.diarizer.speaker_embeddings.parameters.multiscale_weights)
+    cfg.diarizer.speaker_embeddings.parameters.multiscale_weights = scale_weights(r_value, scale_n)
 
     return cfg
+
 
 def objective(
     trial: optuna.Trial, gpu_id: int, cfg: DictConfig, optuna_output_dir: str, speaker_output_dir: str,
@@ -87,8 +85,7 @@ def objective(
             cfg.diarizer.msdd_model.parameters.diar_eval_settings = [
                 (cfg.diarizer.collar, cfg.diarizer.ignore_overlap),
             ]
-            cfg.prepared_manifest_vad_input = os.path.join(cfg.diarizer.out_dir,
-                                                           'manifest_vad.json')
+            cfg.prepared_manifest_vad_input = os.path.join(cfg.diarizer.out_dir, 'manifest_vad.json')
 
             # Sample parameters for this trial
             cfg = sample_params(cfg, trial)
@@ -97,16 +94,17 @@ def objective(
             start_time2 = time.time()
             run_diarization(cfg)
             logging.info(
-                f"Diarization time taken for trial {trial.number}: {(time.time() - start_time2) / 60:.2f} mins")
+                f"Diarization time taken for trial {trial.number}: {(time.time() - start_time2) / 60:.2f} mins"
+            )
 
             # Compute objective value
             hyp_rttms = glob.glob(
-                os.path.join(cfg.output_root, "diar_outputs", "pred_rttms",
-                             "**/*.rttm"), recursive=True)
+                os.path.join(cfg.output_root, "diar_outputs", "pred_rttms", "**/*.rttm"), recursive=True
+            )
             hyp_rttms = sorted(hyp_rttms, key=lambda x: Path(x).stem)
             gt_rttms = glob.glob(
-                os.path.join(cfg.output_root, "diar_outputs", "diar_manifests",
-                             "**/*.rttm"), recursive=True)
+                os.path.join(cfg.output_root, "diar_outputs", "diar_manifests", "**/*.rttm"), recursive=True
+            )
             gt_rttms = sorted(gt_rttms, key=lambda x: Path(x).stem)
 
             # NOTE: this should be macro !
@@ -175,4 +173,3 @@ def main(cfg):
 
 if __name__ == "__main__":
     main()  # noqa pylint: disable=no-value-for-parameter
-
