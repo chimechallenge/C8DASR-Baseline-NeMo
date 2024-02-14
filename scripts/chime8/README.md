@@ -67,14 +67,6 @@ We provide an end-to-end script for data generation and inference with the pre-t
 
 ## Data Generation
 
-Data generation and scoring are handled using [CHiME Challenge Utils: github.com/chimechallenge/chime-utils](https://github.com/chimechallenge/chime-utils). <br>
-
-You can also choose to generate 
-
-
-## Data Generation Only
-
-
 Please find the data preparation scripts at chime-utils repository [CHiME Challenge Utils: github.com/chimechallenge/chime-utils](https://github.com/chimechallenge/chime-utils).
 You will provide a folder containing datasets and annotations as follows.
 ```

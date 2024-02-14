@@ -46,17 +46,17 @@ if [ ${STAGE} -le 0 ] && [ ${STOP_STAGE} -ge 0 ]; then
     echo "$CHECKPOINTS folder already exists, skipping downloading models checkpoints."
   fi
 
-  # if [ ! -d "$MIXER6_ROOT" ]; then
-  #   echo "$MIXER6_ROOT does not exist. Exiting. Mixer 6 data has to be obtained via the LDC.
-  #   Please take a look at https://www.chimechallenge.org/current/task1/data"
-  #   exit
-  # fi
+  if [ ! -d "$MIXER6_ROOT" ]; then
+    echo "$MIXER6_ROOT does not exist. Exiting. Mixer 6 data has to be obtained via the LDC.
+    Please take a look at https://www.chimechallenge.org/current/task1/data"
+    exit
+  fi
 
-  # if [ -d "$CHIME_DATA_ROOT" ]; then
-  #   echo "$CHIME_DATA_ROOT exists already, skipping data download and generation."
-  # else
-  #   chime-utils $DOWNLOAD_ROOT $MIXER6_ROOT $CHIME_DATA_ROOT --part $DGEN_SPLITS --download
-  # fi
+  if [ -d "$CHIME_DATA_ROOT" ]; then
+    echo "$CHIME_DATA_ROOT exists already, skipping data download and generation."
+  else
+    chime-utils $DOWNLOAD_ROOT $MIXER6_ROOT $CHIME_DATA_ROOT --part $DGEN_SPLITS --download
+  fi
 fi
 
 
@@ -73,4 +73,8 @@ python ${SCRIPT_NAME} --config-path="${CONFIG_PATH}" --config-name="$YAML_NAME" 
     output_root=${EXP_DIR} \
     scenarios=${SCENARIOS} \
     subsets="[dev]" \
+    asr_model_path=${ASR_MODEL_PATH} \
+    lm_model_path=${LM_MODEL_PATH} \
+    diarizer.vad.model_path=${VAD_MODEL_PATH} \
+    diarizer.msdd_model.model_path=${MSDD_MODEL_PATH} \
     diarizer.use_saved_embeddings=True
