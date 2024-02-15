@@ -10,7 +10,7 @@
 - Challenge official website page: https://www.chimechallenge.org/current/task1/index
 - If you want to participate please fill this [Google form](https://forms.gle/9NdhZbDEtbto4Bxn6) (one contact person per-team only).
 
-### Prerequisites
+## Prerequisites
 
 - `git`, `pip`, and `bash` installed on your system.
 - CUDA 11.8 compatible hardware and drivers installed for `cupy-cuda11x` to work properly.
@@ -18,15 +18,18 @@
 - libsndfile1 ffmpeg packages installed:
   - `apt-get update && apt-get install -y libsndfile1 ffmpeg`
 
-### Package Installation
+# Steps to Run Baseline System
 
-1. Git clone this repository: 
+## 1. Package Installation
+
+Git clone this repository: 
 
 ```bash
 git clone https://github.com/chimechallenge/C8DASR_NeMo
 ```
 
-2. Create a new conda environment and install the latest Pytorch stable version (2.2.0):
+Create a new conda environment and install the latest Pytorch stable version (2.2.0):
+```
 conda activate chime8_baseline
 pip uninstall -y 'cupy-cuda118'
 pip install --no-cache-dir -f https://pip.cupy.dev/pre/ "cupy-cuda11x[all]==12.1.0"
@@ -40,8 +43,6 @@ pip install cmake>=3.18
 ./run_install_lm.sh "/your/path/to/C8DASR_NeMo"
 ```
 
-### Detailed Installation Steps for ESPnet and Related Tools
-
 If you have `cupy-cuda118` installed, uninstall it.
 
 ```bash
@@ -51,14 +52,14 @@ conda activate c8dasr
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 ```
 
-3. Install NeMo: 
-
+Install NeMo: `/path/to/NeMo` is a path where you clone this repository.
 ```bash
+cd /path/to/NeMo
 pip install Cython
 ./reinstall.sh
 ```
 
-4. Go to this folder and install the additional dependencies: 
+Go to this folder and install the additional dependencies: 
 
 ```bash
 cd scripts/chime8 
@@ -71,18 +72,17 @@ cd scripts/chime8
 feel free to raise an issue or [contact us](#contact).
 
 
-## Launching NeMo CHiME-8 Baseline Inference
+### Launching NeMo CHiME-8 Baseline Inference
 
 We provide an end-to-end script for data generation and inference with the pre-trained baseline NeMo models: 
 `pipeline/launch_inference.sh`.
 
 ```bash
 ./pipeline/launch_inference.sh --DOWNLOAD_ROOT <YOUR_DOWNLOAD_DIR> --MIXER6_ROOT <YOUR_MIXER6_DIR> 
-
 ```
 
 
-## Data Generation
+### Data Generation
 
 Please find the data preparation scripts at chime-utils repository [CHiME Challenge Utils: github.com/chimechallenge/chime-utils](https://github.com/chimechallenge/chime-utils).
 You will provide a folder containing datasets and annotations as follows.
@@ -98,16 +98,17 @@ chime8_official_cleaned/
 ├── mixer6/
 └── notsofar1/
 ```
-
+### Model Download 
 
 Prepare the four model files as followings in the `CHECKPOINTS` folder:
 ```
-VAD_MODEL_PATH=${CHECKPOINTS}/vad_model.nemo
-MSDD_MODEL_PATH=${CHECKPOINTS}/msdd_model.ckpt
-ASR_MODEL_PATH=${CHECKPOINTS}/asr_model.nemo
-LM_MODEL_PATH=${CHECKPOINTS}/lm_model.kenlm
+VAD_MODEL_PATH=${CHECKPOINTS}/MarbleNet_frame_VAD_chime7_Acrobat.nemo
+MSDD_MODEL_PATH=${CHECKPOINTS}/MSDD_v2_PALO_10ms_intrpl_3scales.nemo
+ASR_MODEL_PATH=${CHECKPOINTS}/FastConformerXL-RNNT-Chime7-GSS-Finetuned.nemo 
+LM_MODEL_PATH=${CHECKPOINTS}/ASR_LM_chime7_only.kenlm 
 ```
-
+These four models can be downloaded from Hugging Face, CHiME-DASR Repository:   
+[HuggingFace: NeMo Baseline Models](https://huggingface.co/chime-dasr/nemo_baseline_models)
 
 ## 2. Setup global varialbes (This is temporary, will be removed in the final format)
 
@@ -117,11 +118,11 @@ You need to fill the paths to the following variables.
 Make sure to setup your CHIME8 Data path, temporary directory with write permissions and NeMo root path where NeMo toolkit is cloned.
 
 ```python
-NEMO_ROOT="/path/to/NeMo"
-CHECKPOINTS="/path/to/checkpoints"
-TEMP_DIR="/temp/path/to/chime8_baseline_each1sess"
-CHIME_DATA_ROOT="/path/to/chime8_official_cleaned"
-SCENARIOS="[mixer6,chime6,dipco]"
+NEMO_ROOT=/path/to/NeMo 
+CHECKPOINTS=/path/to/checkpoints
+TEMP_DIR=/temp/path/to/chime8_baseline_tempdir
+CHIME_DATA_ROOT=/path/to/chime8_official_cleaned
+SCENARIOS="[mixer6,chime6,dipco,notsofar1]"
 DIAR_CONFIG="chime8-baseline-all-4"
 ```
 
@@ -139,26 +140,26 @@ Launch the following script after plugging in all the varialbes needed.
 ### YOUR CUSTOMIZED CONFIGURATIONS HERE ###################################
 NEMO_ROOT=/path/to/NeMo # Cloned NeMo folder 
 CHECKPOINTS=/path/to/checkpoints
-TEMP_DIR=/temp/path/to/chime8_baseline_each1sess
+TEMP_DIR=/temp/path/to/chime8_baseline_tempdir
 CHIME_DATA_ROOT=/path/to/chime8_official_cleaned
 SCENARIOS="[mixer6,chime6,dipco,notsofar1]"
 DIAR_CONFIG="chime8-baseline-all-4"
-MAX_NUM_SPKS=8 # 4 or 8
+MAX_NUM_SPKS=8 
 STAGE=0 # [stage 0] diarization [stage 1] GSS [stage 2] ASR [stage 3] scoring
 ###########################################################################
 cd $NEMO_ROOT
 export CUDA_VISIBLE_DEVICES="0"
 
-SCRIPT_NAME=${NEMO_ROOT}/scripts/chime8/pipeline/run_full_pipeline.py
 python -c "import kenlm; print('kenlm imported successfully')" || exit 1
 
-CONFIG_PATH=${NEMO_ROOT}/scripts/chime8/pipeline
-YAML_NAME="chime_config_t385.yaml"
+SCRIPT_NAME=${NEMO_ROOT}/scripts/chime8/pipeline/inference.py
+CONFIG_PATH=${NEMO_ROOT}/scripts/chime8/pipeline/confs
+YAML_NAME="chime_config.yaml"
 
-VAD_MODEL_PATH=${CHECKPOINTS}/vad_model.nemo
-MSDD_MODEL_PATH=${CHECKPOINTS}/msdd_model.ckpt
-ASR_MODEL_PATH=${CHECKPOINTS}/asr_model.nemo
-LM_MODEL_PATH=${CHECKPOINTS}/lm_model.kenlm
+VAD_MODEL_PATH=${CHECKPOINTS}/MarbleNet_frame_VAD_chime7_Acrobat.nemo
+MSDD_MODEL_PATH=${CHECKPOINTS}/MSDD_v2_PALO_10ms_intrpl_3scales.nemo
+ASR_MODEL_PATH=${CHECKPOINTS}/FastConformerXL-RNNT-Chime7-GSS-Finetuned.nemo 
+LM_MODEL_PATH=${CHECKPOINTS}/ASR_LM_chime7_only.kenlm 
 
 SITE_PACKAGES=`$(which python) -c 'import site; print(site.getsitepackages()[0])'`
 export KENLM_ROOT=$NEMO_ROOT/decoders/kenlm
