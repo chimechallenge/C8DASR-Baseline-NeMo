@@ -288,7 +288,7 @@ def get_mc_audio_filepaths(multichannel_audio_files: str, dataset: str, dataset_
         if dataset in ['chime6', 'dipco', 'notsofar1']:
             file_ext = '_U??.CH?.wav'
         elif dataset in ['mixer6']:
-            file_ext = '_CH??.wav'
+            file_ext = '_CH??.flac'
 
         # Get single-channel files
         sc_audio_files_loaded = glob.glob(os.path.join(dataset_dir, filepath_base + file_ext))
