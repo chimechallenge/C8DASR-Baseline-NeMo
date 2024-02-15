@@ -492,22 +492,21 @@ def prepare_mixer6(
         else:
             sess2audio[sess_name].append(audio_f)
 
-    recordings = []
-    supervisions = []
+    recordings, supervisions = [], []
     for sess in all_sessions:
         with open(os.path.join(transcriptions_dir, subset, f"{sess}.json")) as f:
             transcript = json.load(f)
         if mic == "ihm":
-            if subset.startswith("train"):
-                if mic == "ihm" and subset.startswith("train"):
+            if subset in ["train_intv", "train_call"]:
+                if mic == "ihm" and subset in ["train_intv", "train_call"]:
                     current_sess_audio = [
                         x for x in sess2audio[sess] if Path(x).stem.split("_")[-1] in ["CH02"]
                     ]  # only interview and call
 
-            elif subset == "dev":
+            elif subset in ["train", "dev"]:
                 current_sess_audio = [
                     x for x in sess2audio[sess] if Path(x).stem.split("_")[-1] in ["CH02", "CH01"]
-                ]  #
+                ]  # only train and dev set 
             else:
                 raise NotImplementedError("No close-talk mics for eval set")
 
@@ -578,9 +577,13 @@ def prepare_mixer6(
                     speaker=spk_id,
                 )
             )
-    recording_set, supervision_set = fix_manifests(
-        RecordingSet.from_recordings(recordings), SupervisionSet.from_segments(supervisions),
-    )
+
+    try:
+        recording_set, supervision_set = fix_manifests(
+            RecordingSet.from_recordings(recordings), SupervisionSet.from_segments(supervisions),
+        )
+    except:
+        import ipdb; ipdb.set_trace()
 
     # Fix manifests
     validate_recordings_and_supervisions(recording_set, supervision_set)
@@ -671,23 +674,19 @@ def prepare_chime_manifests(
             if subset in ["eval"] and mic == "ihm":
                 continue
 
-            if subset.startswith("train"):
-                supervisions = []
-                recordings = []
-                for subset in ["train_intv", "train_call"]:
-                    c_manifest = prepare_mixer6(
-                        os.path.join(data_root, scenario),
-                        None,
-                        subset,
-                        mic=mic,
-                        ignore_shorter=ignore_shorter,
-                        json_dir=os.path.join(diarization_json_dir, scenario),
-                        normalize_text=text_norm,
-                    )
-
-                    supervisions.append(c_manifest[subset]["supervisions"])
-                    recordings.append(c_manifest[subset]["recordings"])
-
+            if subset in ["train_intv", "train_call"]:
+                supervisions, recordings = [], []
+                c_manifest = prepare_mixer6(
+                    os.path.join(data_root, scenario),
+                    None,
+                    subset,
+                    mic=mic,
+                    ignore_shorter=ignore_shorter,
+                    json_dir=os.path.join(diarization_json_dir, scenario),
+                    normalize_text=text_norm,
+                )
+                supervisions.append(c_manifest[subset]["supervisions"])
+                recordings.append(c_manifest[subset]["recordings"])
                 supervision_set = lhotse.combine(*supervisions)
                 recording_set = lhotse.combine(*recordings)
                 recording_set, supervision_set = fix_manifests(

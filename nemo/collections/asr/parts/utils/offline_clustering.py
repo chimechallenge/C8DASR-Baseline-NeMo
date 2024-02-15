@@ -1651,7 +1651,7 @@ class SpeakerClustering(torch.nn.Module):
         fixed_thres: float = -1,
         kmeans_random_trials: int = 1,
         nme_mat_size: int = 512,
-        drop_length_thres: int = 4800,
+        drop_length_thres: int = 4500,
         maj_vote_spk_count: bool = True,
         reclus_aff_thres: float = 0.85,
         use_drop_and_recluster: bool = True,

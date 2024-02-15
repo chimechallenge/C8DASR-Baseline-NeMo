@@ -124,12 +124,12 @@ diarizer:
       max_num_speakers: ${max_num_spks} # Max number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.
       min_num_speakers: 2 # Min number of speakers for each recording. If an oracle number of speakers is passed, this value is ignored.
       enhanced_count_thres: 80 # If the number of segments is lower than this number, enhanced speaker counting is activated.
-      max_rp_threshold: 0.9
+      max_rp_threshold: 0.25
       sparse_search_volume: 25 # The higher the number, the more values will be examined with more time. 
       maj_vote_spk_count: False  # If True, take a majority vote on multiple p-values to estimate the number of speakers.
       clustering_scale_index: 2 # The index of scale to be used for clustering.
       sync_score_thres: 0.9 # Cascaded clustering threshold for deciding whether to proceed to the finer scale.
-      reclus_aff_thres: 0.75 # Affinity threshold for reducing the number of clusters in the re-clustering step. Recommended range is [0.7, 0.9].
+      reclus_aff_thres: 0.67 # Affinity threshold for reducing the number of clusters in the re-clustering step. Recommended range is [0.65, 0.9].
       max_mc_ch_num: 5
       
        

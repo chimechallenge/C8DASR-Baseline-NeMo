@@ -710,7 +710,7 @@ def perform_clustering_embs(
     vad_threshold: float,
     multiscale_dict: dict, 
     verbose: bool = True,
-    drop_length_thres = 4800,
+    drop_length_thres = 4500,
     feat_per_sec: int = 100,
     long_audio_thres: int = 100000,
     unit_clus_len: int = 1000,

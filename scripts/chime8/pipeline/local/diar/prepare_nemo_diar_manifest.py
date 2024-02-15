@@ -174,7 +174,6 @@ def create_multichannel_manifest(
                 "ctm_filepath": ctm,
             }
         ]
-        print(f"meta file: {meta}")
         lines.extend(meta)
 
     write_file(manifest_filepath, lines, range(len(lines)))

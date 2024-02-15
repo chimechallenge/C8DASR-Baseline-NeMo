@@ -22,10 +22,10 @@ python -c "import kenlm; print('kenlm imported successfully')" || exit 1
 CONFIG_PATH=${NEMO_ROOT}/scripts/chime8/pipeline/confs
 YAML_NAME="chime_config"
 
-VAD_MODEL_PATH=${CHECKPOINTS}/vad_model.nemo
-MSDD_MODEL_PATH=${CHECKPOINTS}/msdd_model.ckpt
-ASR_MODEL_PATH=${CHECKPOINTS}/asr_model.nemo
-LM_MODEL_PATH=${CHECKPOINTS}/lm_model.kenlm
+VAD_MODEL_PATH=${CHECKPOINTS}/MarbleNet_frame_VAD_chime7_Acrobat.nemo
+MSDD_MODEL_PATH=${CHECKPOINTS}/MSDD_v2_PALO_100ms_intrpl_3scales.nemo
+ASR_MODEL_PATH=${CHECKPOINTS}/FastConformerXL-RNNT-chime7-GSS-finetuned.nemo
+LM_MODEL_PATH=${CHECKPOINTS}/ASR_LM_chime7_only.kenlm 
 
 SITE_PACKAGES=`$(which python) -c 'import site; print(site.getsitepackages()[0])'`
 DECODERS_DIR=/home/heh/codes/nemo-taejin
