@@ -25,11 +25,11 @@
 Git clone this repository: 
 
 ```bash
-git clone https://github.com/chimechallenge/C8DASR_NeMo
+git clone https://github.com/chimechallenge/C8DASR-Baseline-NeMo
 ```
 
 Create a new conda environment and install the latest Pytorch stable version (2.2.0):
-```
+```bash
 conda activate chime8_baseline
 pip uninstall -y 'cupy-cuda118'
 pip install --no-cache-dir -f https://pip.cupy.dev/pre/ "cupy-cuda11x[all]==12.1.0"
@@ -46,15 +46,15 @@ pip install cmake>=3.18
 If you have `cupy-cuda118` installed, uninstall it.
 
 ```bash
-cd C8DASR_NeMo
+cd C8DASR-Baseline-NeMo
 conda create --name c8dasr python==3.10.12
 conda activate c8dasr
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 ```
 
-Install NeMo: `/path/to/NeMo` is a path where you clone this repository.
+Install NeMo: `/path/to/C8DASR-Baseline-NeMo` is a path where you clone this repository.
 ```bash
-cd /path/to/NeMo
+cd /path/to/C8DASR-Baseline-NeMo
 pip install Cython
 ./reinstall.sh
 ```
@@ -103,16 +103,16 @@ chime8_official_cleaned/
 Prepare the four model files as followings in the `CHECKPOINTS` folder:
 ```
 VAD_MODEL_PATH=${CHECKPOINTS}/MarbleNet_frame_VAD_chime7_Acrobat.nemo
-MSDD_MODEL_PATH=${CHECKPOINTS}/MSDD_v2_PALO_10ms_intrpl_3scales.nemo
-ASR_MODEL_PATH=${CHECKPOINTS}/FastConformerXL-RNNT-Chime7-GSS-Finetuned.nemo 
+MSDD_MODEL_PATH=${CHECKPOINTS}/MSDD_v2_PALO_100ms_intrpl_3scales.nemo
+ASR_MODEL_PATH=${CHECKPOINTS}/FastConformerXL-RNNT-chime7-GSS-finetuned.nemo
 LM_MODEL_PATH=${CHECKPOINTS}/ASR_LM_chime7_only.kenlm 
 ```
 These four models can be downloaded from Hugging Face, CHiME-DASR Repository:   
 [HuggingFace: NeMo Baseline Models](https://huggingface.co/chime-dasr/nemo_baseline_models)
 
-## 2. Setup global varialbes (This is temporary, will be removed in the final format)
+## 2. Setup Global Varialbes
 
-Use the main inference script: `<NeMo Root>/scripts/chime8/pipeline/run_full_pipeline.py`
+Use the main inference script: `<NeMo Root>/scripts/chime8/pipeline/inference.py`
 
 You need to fill the paths to the following variables.
 Make sure to setup your CHIME8 Data path, temporary directory with write permissions and NeMo root path where NeMo toolkit is cloned.
@@ -138,7 +138,7 @@ Launch the following script after plugging in all the varialbes needed.
 ```bash
 ###########################################################################
 ### YOUR CUSTOMIZED CONFIGURATIONS HERE ###################################
-NEMO_ROOT=/path/to/NeMo # Cloned NeMo folder 
+NEMO_ROOT=/path/to/C8DASR-Baseline-NeMo # Cloned NeMo folder 
 CHECKPOINTS=/path/to/checkpoints
 TEMP_DIR=/temp/path/to/chime8_baseline_tempdir
 CHIME_DATA_ROOT=/path/to/chime8_official_cleaned
@@ -157,8 +157,8 @@ CONFIG_PATH=${NEMO_ROOT}/scripts/chime8/pipeline/confs
 YAML_NAME="chime_config.yaml"
 
 VAD_MODEL_PATH=${CHECKPOINTS}/MarbleNet_frame_VAD_chime7_Acrobat.nemo
-MSDD_MODEL_PATH=${CHECKPOINTS}/MSDD_v2_PALO_10ms_intrpl_3scales.nemo
-ASR_MODEL_PATH=${CHECKPOINTS}/FastConformerXL-RNNT-Chime7-GSS-Finetuned.nemo 
+MSDD_MODEL_PATH=${CHECKPOINTS}/MSDD_v2_PALO_100ms_intrpl_3scales.nemo
+ASR_MODEL_PATH=${CHECKPOINTS}/FastConformerXL-RNNT-chime7-GSS-finetuned.nemo
 LM_MODEL_PATH=${CHECKPOINTS}/ASR_LM_chime7_only.kenlm 
 
 SITE_PACKAGES=`$(which python) -c 'import site; print(site.getsitepackages()[0])'`
