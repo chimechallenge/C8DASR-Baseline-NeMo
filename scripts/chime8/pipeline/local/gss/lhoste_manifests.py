@@ -631,9 +631,6 @@ def prepare_chime_manifests(
     )
     assert subset in ["train", "dev", "eval",], "Option --subset should be 'train', 'dev' or 'eval'"
 
-    if subset == "train" and scenario == "dipco":
-        raise NotImplementedError("DiPCo has no training set. Exiting.")
-
     if subset in ["train", "dev"] and diarization_json_dir is None:
         valid_mics = ["mdm", "ihm"]
     elif subset == "eval" or diarization_json_dir is not None:
