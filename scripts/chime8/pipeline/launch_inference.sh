@@ -2,7 +2,7 @@
 ###########################################################################
 ### YOUR CUSTOMIZED CONFIGURATIONS HERE ###################################
 NEMO_ROOT=${PWD}/../../../ # path to your NeMo root
-CHECKPOINTS=${PWD}/models_ckpt # pre-trained models checkpoints will be downloaded here
+CHECKPOINTS=${PWD}/nemo_baseline_models # pre-trained models checkpoints will be downloaded here
 EXP_DIR=${PWD}/exp
 CHIME_DATA_ROOT=/raid/users/popcornell/CHiME6/tmp_chimeutils/chime8_dasr
 DOWNLOAD_ROOT=/raid/users/popcornell/chime8datasets # put your download folder here
