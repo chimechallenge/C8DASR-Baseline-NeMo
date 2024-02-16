@@ -4,13 +4,13 @@
 NEMO_ROOT=${PWD}/../../../ # path to your NeMo root
 CHECKPOINTS=${PWD}/nemo_baseline_models # pre-trained models checkpoints will be downloaded here
 EXP_DIR=${PWD}/exp
-CHIME_DATA_ROOT=/raid/users/popcornell/CHiME6/tmp_chimeutils/chime8_dasr
+CHIME_DATA_ROOT=/raid/users/popcornell/CHiME6/tmp_chimeutils/chime8_dasr_w_gt
 DOWNLOAD_ROOT=/raid/users/popcornell/chime8datasets # put your download folder here
 MIXER6_ROOT=/raid/users/popcornell/mixer6 # you have to put yours
 DGEN_SPLITS="train,dev" # which datasets splits you want to generate, note that evaluation will be available later.
 STAGE=0 # stage 0 downloads the checkpoints and does data generation. inference starts at stage 1.
 STOP_STAGE=0
-SCENARIOS="[chime6,dipco]"
+SCENARIOS="[chime6,dipco,mixer6]"
 DIAR_CONFIG="chime8-baseline-mixer6-short1"
 ###########################################################################
 cd $NEMO_ROOT
