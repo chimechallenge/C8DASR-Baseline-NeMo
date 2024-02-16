@@ -159,15 +159,13 @@ def main(cfg):
 
     logging.info(f"Running {cfg.optuna.n_trials} trials on {n_jobs} GPUs, using {available_devices} GPUs")
 
-    optimize(1)
+    for i in range(len(available_devices)):
+        p = Process(target=optimize, args=(i,))
+        processes.append(p)
+        p.start()
 
-    # for i in range(len(available_devices)):
-    #     p = Process(target=optimize, args=(i,))
-    #     processes.append(p)
-    #     p.start()
-
-    # for t in processes:
-    #     t.join()
+    for t in processes:
+        t.join()
 
     study = optuna.load_study(study_name=cfg.optuna.study_name, storage=cfg.optuna.storage)
     logging.info(f"Best DER {study.best_value}")
