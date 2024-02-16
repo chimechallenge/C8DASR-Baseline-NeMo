@@ -169,7 +169,7 @@ gss:
   bss_iterations: 5
   context_duration: 15
   use_garbage_class: true
-  min_segment_length: 0.02
+  min_segment_length: 0.2
   max_segment_length: 30 # reduce if you encounter OOM (may raise WER however)
   max_batch_duration: 100 # not used right now
   max_batch_cuts: 1
