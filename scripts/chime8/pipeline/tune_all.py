@@ -58,7 +58,7 @@ def sample_params(cfg: DictConfig, trial: optuna.Trial):
     cfg.diarizer.clustering.parameters.sparse_search_volume = trial.suggest_int(
         "sparse_search_volume", low=25, high=25, step=1
     )
-    cfg.diarizer.clustering.reclus_aff_thres = trial.suggest_float("reclus_aff_thres", low=0.7, high=0.9, step=0.01)
+    cfg.diarizer.clustering.reclus_aff_thres = trial.suggest_float("reclus_aff_thres", low=0.6, high=0.9, step=0.01)
 
     r_value = round(trial.suggest_float("r_value", 0.5, 2.5, step=0.05), 4)
     scale_n = len(cfg.diarizer.speaker_embeddings.parameters.multiscale_weights)

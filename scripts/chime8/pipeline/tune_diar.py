@@ -58,7 +58,7 @@ def sample_params(cfg: DictConfig, trial: optuna.Trial):
         "sparse_search_volume", low=10, high=25, step=1
     )
     cfg.diarizer.clustering.parameters.sync_score_thres = trial.suggest_float("sync_score_thres", 0.4, 0.95, step=0.02)
-    cfg.diarizer.clustering.reclus_aff_thres = trial.suggest_float("reclus_aff_thres", low=0.7, high=0.9, step=0.01)
+    cfg.diarizer.clustering.reclus_aff_thres = trial.suggest_float("reclus_aff_thres", low=0.6, high=0.9, step=0.01)
 
     r_value = round(trial.suggest_float("r_value", 0.5, 2.5, step=0.05), 4)
     scale_n = len(cfg.diarizer.speaker_embeddings.parameters.multiscale_weights)
@@ -159,13 +159,15 @@ def main(cfg):
 
     logging.info(f"Running {cfg.optuna.n_trials} trials on {n_jobs} GPUs, using {available_devices} GPUs")
 
-    for i in range(len(available_devices)):
-        p = Process(target=optimize, args=(i,))
-        processes.append(p)
-        p.start()
+    optimize(1)
 
-    for t in processes:
-        t.join()
+    # for i in range(len(available_devices)):
+    #     p = Process(target=optimize, args=(i,))
+    #     processes.append(p)
+    #     p.start()
+
+    # for t in processes:
+    #     t.join()
 
     study = optuna.load_study(study_name=cfg.optuna.study_name, storage=cfg.optuna.storage)
     logging.info(f"Best DER {study.best_value}")
