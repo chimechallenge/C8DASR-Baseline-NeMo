@@ -71,7 +71,6 @@ def create_multichannel_manifest(
     rttm_path: str = None,
     uem_path: str = None,
     ctm_path: str = None,
-    add_duration: bool = False,
 ):
     """
     Create base manifest file
@@ -119,7 +118,6 @@ def create_multichannel_manifest(
         if rttm is not None:
             rttm = rttm.strip()
             num_speakers, rttm_min, rttm_max = get_rttm_info(rttm_filepath=rttm)
-            rttm_dur = rttm_max - rttm_min
         else:
             num_speakers = None
 
@@ -489,7 +487,6 @@ def generate_annotations(
             rttm_path=out_rttm_file_list_path,
             ctm_path=out_ctm_file_list_path,
             uem_path=out_uem_file_list_path,
-            add_duration=True,
         )
 
     # Display data statistics

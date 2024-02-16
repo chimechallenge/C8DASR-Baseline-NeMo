@@ -158,7 +158,7 @@ def get_interpolate_weights(
     Interpolate embeddings to a finer scale.
 
     Args:
-        ms_seg_timestamps (torch.Tensor): timestamps of the base scale
+        ms_seg_timestamps (Tensor): timestamps of the base scale
         base_seq_len (int): length of the base scale
         msdd_multiscale_args_dict (dict): multi-scale arguments
         emb_scale_n (int): scale index of the embeddings
@@ -166,7 +166,7 @@ def get_interpolate_weights(
         is_integer_ts (bool): whether timestamps are integer or not
     
     Returns:
-        interpolated_weights (torch.Tensor): interpolated weights tensor 
+        interpolated_weights (Tensor): interpolated weights tensor 
     """
     deci = 100.0 if is_integer_ts else 1.0
     half_scale = msdd_multiscale_args_dict['scale_dict'][emb_scale_n-1][1]
@@ -681,9 +681,8 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         self._validation_dl = self.__setup_dataloader_from_config(config=val_data_config,)
         return max_len_ms_ts, max_len_scale_map 
 
-    def setup_multiple_test_data(self, test_data_config):
-        """
-        MSDD does not use multiple_test_data template. This function is a placeholder for preventing error.
+    def setup_multiple_test_data(self):
+        """MSDD does not use multiple_test_data template. This function is a placeholder for preventing error.
         """
         return None
 
@@ -719,7 +718,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
             }
         )
 
-    # @check_multiscale_data
     def get_ms_emb_fixed(
         self, 
         embs: torch.Tensor, 
@@ -729,8 +727,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
     ):
         batch_size = scale_mapping.shape[0]
         split_emb_tup = torch.split(embs, ms_seg_counts[:, :self.emb_scale_n].flatten().tolist(), dim=0)
-        ms_ts = ms_seg_timestamps[:, :, :ms_seg_counts[0][self.emb_scale_n-1],:]
-
         base_seq_len = ms_seg_counts[0][self.msdd_scale_n-1].item()
         target_embs = torch.vstack(split_emb_tup).reshape(batch_size, -1, embs.shape[-1])
         intp_w = get_interpolate_weights(ms_seg_timestamps[0], 
@@ -739,7 +735,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
                                          self.emb_scale_n, 
                                          self.msdd_scale_n, 
                                          is_integer_ts=True)
-
         repeat_mats_ext = scale_mapping[0][:self.emb_scale_n].to(embs.device)
         all_seq_len = ms_seg_counts[0][-1].to(embs.device)
         
@@ -782,6 +777,25 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         batch_size, 
         all_seq_len
         ):
+        """
+        Calculate the interpolated embeddings and concatenate them to the extracted embeddings.
+
+        Args:
+            target_embs (Tensor):
+                Target embeddings to be interpolated.
+            intp_w (Tensor):
+                Interpolation weights.
+            repeat_mats_ext (Tensor):
+                Repeated scale mapping tensor.
+            ms_seg_counts (Tensor):
+                Segment counts for each scale.
+            embs (Tensor):
+                Embeddings tensor.
+            batch_size (int):
+                Batch size in integer.
+            all_seq_len (int):
+                Total sequence length.
+        """ 
         scale_count_offsets = torch.tensor([0] + torch.cumsum(ms_seg_counts[0][:self.emb_scale_n-1], dim=0).tolist())
         repeat_mats_ext = repeat_mats_ext + (scale_count_offsets.to(embs.device)).unsqueeze(1).repeat(1, all_seq_len).to(embs.device)
         extracted_embs = target_embs[:, repeat_mats_ext.flatten(), :].reshape(batch_size, self.emb_scale_n, -1, embs.shape[-1])
@@ -892,6 +906,35 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         feature_count_range,
         device,
         ):
+        """
+        Forward pass of the model for multi-scale diarization.
+
+        Args:
+            processed_signal (Tensor): 
+                Tensor containing the time-series input audio signal.
+            processed_signal_len (Tensor): 
+                Tensor containing the length of the input audio signal.
+            total_seg_count (int):
+                Total number of segments in the batch.
+            ms_seg_count_frame_range (Tensor):
+                Range of segment indices for each frame in the batch.
+            feature_frame_length_range (Tensor):
+                Range of feature indices for each frame in the batch.
+            batch_frame_range (Tensor):
+                Range of batch indices for each frame in the batch.
+            feature_frame_interval_range (Tensor):
+                Range of feature interval indices for each frame in the batch.
+            feature_count_range (Tensor):
+                Range of feature counts for each segment in the batch.
+            device (torch.device):
+                Device to run the model on.
+
+        Returns:
+            embs (Tensor):
+                Speaker embeddings for each segment in the batch.
+            pools (Tensor):
+                Pooled embeddings for each segment in the batch.
+        """
         # Assign the acoustic feature values in processed_signal at once
         encoded, _ = self.msdd._speaker_model.encoder(audio_signal=processed_signal, length=processed_signal_len)
         encoded_segments = torch.zeros(total_seg_count, encoded.shape[1], self.max_feat_frame_count).to(torch.float32).to(device)
@@ -938,14 +981,26 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
 
     def forward_multiscale(
         self, 
-        processed_signal, 
-        processed_signal_len, 
-        ms_seg_timestamps, 
-        ms_seg_counts,
-        vad_probs_frame=None,
+        processed_signal: torch.Tensor, 
+        processed_signal_len: torch.Tensor, 
+        ms_seg_timestamps: torch.Tensor, 
+        ms_seg_counts: torch.Tensor,
+        vad_probs_frame: torch.Tensor=None,
         ):
         """
         Forward pass of the model for multi-scale diarization.
+
+        Args:
+            processed_signal (Tensor): 
+                Tensor containing the time-series input audio signal.
+            processed_signal_len (Tensor): 
+                Tensor containing the length of the input audio signal.
+            ms_seg_timestamps (Tensor): 
+                Tensor containing the timestamps of multiscale segments.
+            ms_seg_counts (Tensor): 
+                Tensor containing the counts of multiscale segments.
+            vad_probs_frame (Tensor): 
+                Tensor containing the VAD probabilities for each frame in the batch.
         """
         tsc, mscfr, fflr, bfr, ffir, fcr = self.get_feature_index_map(emb_scale_n=self.emb_scale_n,
                                                                       processed_signal=processed_signal, 
@@ -1020,10 +1075,10 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         Convert length values to encoder mask input tensor.
 
         Args:
-            context_embs (torch.Tensor): tensor containing embeddings of multiscale segments
+            context_embs (Tensor): tensor containing embeddings of multiscale segments
 
         Returns:
-            mask (torch.Tensor): tensor of shape (batch_size, max_len) containing 0's
+            mask (Tensor): tensor of shape (batch_size, max_len) containing 0's
                                 in the padded region and 1's elsewhere
         """
         lengths=torch.tensor([context_embs.shape[1]] * context_embs.shape[0]) 
@@ -1045,13 +1100,18 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         ):
         """
         Args:
-            ms_emb_seq (torch.Tensor): tensor containing embeddings of multiscale embedding vectors
+            ms_emb_seq (Tensor): tensor containing embeddings of multiscale embedding vectors
                 Dimension: (batch_size, max_seg_count, msdd_scale_n, emb_dim)
-            length (torch.Tensor): tensor containing lengths of multiscale segments
+            length (Tensor): tensor containing lengths of multiscale segments
                 Dimension: (batch_size, max_seg_count)
-            ms_avg_embs (torch.Tensor): tensor containing average embeddings of multiscale segments
+            ms_avg_embs (Tensor): tensor containing average embeddings of multiscale segments
                 Dimension: (batch_size, msdd_scale_n, emb_dim)
 
+        Returns:
+            preds (Tensor): tensor containing speaker predictions
+                Dimension: (batch_size, max_seg_count, max_num_of_spks)
+            scale_weights (Tensor): tensor containing scale weights
+                Dimension: (batch_size, max_seg_count, msdd_scale_n)
         """
         context_embs, scale_weights = self.msdd.forward_context(ms_emb_seq=ms_emb_seq, 
                                                                 length=seq_lengths,
@@ -1076,8 +1136,7 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         scale_mapping, 
         ch_clus_mat,
     ):
-        """
-        Encoder part for end-to-end diarizaiton model.
+        """Encoder part for end-to-end diarizaiton model.
         """
         audio_signal = audio_signal.to(self.device)
         self.msdd._vad_model = self.msdd._vad_model.to(self.device)
@@ -1096,7 +1155,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         )
         vad_probs_frame = self.forward_vad(audio_signal=audio_signal, audio_signal_length=audio_signal_length)
         
-        # preds = generate_vad_segment_table_per_tensor(vad_probs_frame[0], per_args=per_args)
         embs, pools, vad_probs, vad_probs_segments = self.forward_multiscale(
             processed_signal=processed_signal, 
             processed_signal_len=processed_signal_length, 
@@ -1188,13 +1246,14 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
             audio_signal (Tensor):
                 Multi-channel time series audio signal input.
                 [Batch, Time, Channels] or [Channels, Time]
+            mcf (Dict):
+                Dictionary containing dereverberation parameters.
 
         Returns:
             audio_signal (Tensor):
                 Dereverberated multi-channel time series audio signal output.
                 [Batch, Time, Channels] or [Channels, Time]
         """
-        
         if len(audio_signal.shape) > 2:
             mc_flag = True
         else:
@@ -1222,10 +1281,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         scale_mapping, 
         ch_clus_mat,
     ):
-        """
-        Forward pass for training.
-        Multi-channel embedding 
-        """      
         if self.derev:
             audio_signal = self.dereverberation(audio_signal, mcf=self.cfg_msdd_model.dereverb_parameters)
          
@@ -1244,8 +1299,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
             clus_label_index[vad_probs < self.vad_thres] == -1
             
         ms_avg_embs, ms_avg_var_weights = self.get_cluster_avg_embs_model(ms_emb_seq, clus_label_index, ms_seg_counts[:,-1])
-
-        # Step 3: MSDD Inference
         preds, scale_weights = self.forward_infer(ms_emb_seq=ms_emb_seq, seq_lengths=ms_seg_counts[:, -1], ms_avg_embs=ms_avg_embs)
         return preds, vad_probs, scale_weights, batch_cos_sim, ms_pools_seq
 
@@ -1295,7 +1348,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
             scale_mapping=scale_mapping,
             ch_clus_mat=ch_clus_mat,
         )
-        # batch_global_spk_labels = clus_label_index.unsqueeze(2).repeat(1,1,ms_emb_seq.shape[2]).reshape(clus_label_index.shape[0], -1)
         loss_glb = self.global_loss(logits=ms_pools_seq.reshape(-1, ms_pools_seq.shape[-1]), labels=global_spk_labels.view(-1))
         spk_loss = self.loss(probs=preds, labels=targets) 
         vad_loss = self.loss(probs=vad_probs.unsqueeze(2), labels=targets.max(dim=2)[0].unsqueeze(2))
@@ -1404,8 +1456,7 @@ class ClusterEmbedding(torch.nn.Module):
         self.clus_diar_model = ClusteringMultiChDiarizer(cfg=self.cfg_diar_infer, speaker_model=self.msdd_model)
 
     def prepare_cluster_embs_infer(self, mc_input: bool = False, use_mc_embs: bool = False):
-        """
-        Launch clustering diarizer to prepare embedding vectors and clustering results.
+        """Launch clustering diarizer to prepare embedding vectors and clustering results.
         """
         self.max_num_speakers = self.cfg_diar_infer.diarizer.clustering.parameters.max_num_speakers
         emb_seq_test, ms_time_stamps, vad_probs, clus_test_label_dict = self.run_clustering_diarizer(
@@ -1414,8 +1465,7 @@ class ClusterEmbedding(torch.nn.Module):
         return emb_seq_test, ms_time_stamps, vad_probs, clus_test_label_dict
 
     def _init_msdd_model(self, cfg: Union[DictConfig, NeuralDiarizerInferenceConfig], device: str):
-        """
-        Initialized MSDD model with the provided config. Load either from `.nemo` file or `.ckpt` checkpoint files.
+        """Initialized MSDD model with the provided config. Load either from `.nemo` file or `.ckpt` checkpoint files.
         """
         model_path = cfg.diarizer.msdd_model.model_path
         if model_path.endswith('.nemo'):
@@ -1433,7 +1483,9 @@ class ClusterEmbedding(torch.nn.Module):
             msdd_model = EncDecDiarLabelModel.from_pretrained(model_name=model_path, map_location=device)
         return msdd_model
 
-    def _init_clus_diarizer(self, manifest_filepath, emb_dir):
+    def _init_clus_diarizer(self, manifest_filepath: str, emb_dir: str):
+        """Initialize clustering diarizer for inference with the provided manifest file and output directory.
+        """
         self.cfg_diar_infer.diarizer.manifest_filepath = manifest_filepath
         self.cfg_diar_infer.diarizer.out_dir = emb_dir
 
@@ -1461,15 +1513,21 @@ class ClusterEmbedding(torch.nn.Module):
             manifest_filepath (str):
                 Input manifest file for creating audio-to-RTTM mapping.
             emb_dir (str):
-                Output directory where embedding files and timestamp files are saved.
+                Output directory for storing embeddings and RTTM files.
+            mc_input (bool):
+                Whether the input is multi-channel audio.
+            use_mc_embs (bool):
+                Whether to use multi-channel embeddings.
 
         Returns:
-            emb_sess_avg_dict (dict):
-                Dictionary containing cluster-average embeddings for each session.
-            emb_scale_seq_dict (dict):
-                Dictionary containing embedding tensors which are indexed by scale numbers.
-            base_clus_label_dict (dict):
-                Dictionary containing clustering results. Clustering results are cluster labels for the base scale segments.
+            emb_seq_test (Tensor):
+                Speaker embedding sequence for the entire session.
+            ms_time_stamps (Tensor):
+                Time stamps for each segment in the entire session.
+            vad_probs (Tensor):
+                VAD probabilities for each segment in the entire session.
+            clus_test_label_dict (Dict):
+                Dictionary containing clustering labels for each segment in the entire session.
         """
         if not use_mc_embs:
             self._init_clus_diarizer(manifest_filepath, emb_dir)
@@ -1682,7 +1740,7 @@ class NeuralDiarizer(LightningModule):
         Update the average embeddings for each session and retrieve the updated average embeddings.
 
         Args:
-            ms_avg_embs_current (torch.tensor):
+            ms_avg_embs_current (Tensor):
                 Current average embeddings for each session.
             batch_uniq_ids (list):
                 List containing unique IDs for each session.
@@ -1701,17 +1759,7 @@ class NeuralDiarizer(LightningModule):
     
     def run_mc_multiscale_decoder(self) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
         """
-        Setup the parameters needed for batch inference and run batch inference. Note that each sample is pairwise speaker input.
-        The pairwise inference results are reconstructed to make session-wise prediction results.
-
-        ms_emb_seq: (torch.tensor)
-            Dimension: (batch_size, max_seq_len, scale_n, emb_dim, max_ch)
-        seq_lengths: (torch.tensor)
-            Dimension: (batch_size,)
-        ms_avg_embs: (torch.tensor)
-
-        clus_label_index: (torch.tensor)
-            Dimension: (batch_size, max_seq_len, max_ch)
+        Setup the parameters needed for batch inference and run batch multi-channel MSDD inference.
 
         Returns:
             integrated_preds_list: (list)
@@ -1729,7 +1777,7 @@ class NeuralDiarizer(LightningModule):
         batch_size = self.msdd_model.cfg.test_ds.batch_size
 
         cumul_sample_count = [0]
-        preds_list, targets_list, timestamps_list = [], [], []
+        preds_list, targets_list = [], []
         device = self.msdd_model.device
         all_manifest_uniq_ids = get_uniq_id_list_from_manifest(self.msdd_model.msdd_segmented_manifest_path)
         
@@ -1754,11 +1802,9 @@ class NeuralDiarizer(LightningModule):
         for test_batch_idx, _test_batch in enumerate(tqdm(self.msdd_model.test_dataloader(), desc="Running multiscale decoder")):
             test_batch = [ x.to(device) for x in _test_batch ]
             
-            # ms_emb_seq, _, seq_lengths, clus_label_index, targets = test_batch
             mc_ms_emb_seq, _, mc_seq_lengths, mc_clus_label_index, targets = test_batch
             batch_uniq_ids = all_manifest_uniq_ids[test_batch_idx * batch_size: (test_batch_idx+1) * batch_size]
             
-            # ms_emb_seq, seq_lengths, clus_label_index, targets = ms_emb_seq.to(device), seq_lengths.to(device), clus_label_index.to(device), targets.to(device)
             cumul_sample_count.append(cumul_sample_count[-1] + seq_lengths.shape[0])
             preds_batch_list = []
             for bi in tqdm(range(mc_ms_emb_seq.shape[0]), desc="Computing average embeddings per sample in batch", leave=False):
@@ -1797,8 +1843,7 @@ class NeuralDiarizer(LightningModule):
     
     def run_sc_multiscale_decoder(self) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
         """
-        Setup the parameters needed for batch inference and run batch inference. Note that each sample is pairwise speaker input.
-        The pairwise inference results are reconstructed to make session-wise prediction results.
+        Setup the parameters needed for batch inference and run batch single-channel MSDD inference.
 
         Returns:
             integrated_preds_list: (list)
@@ -1821,7 +1866,6 @@ class NeuralDiarizer(LightningModule):
         all_manifest_uniq_ids = get_uniq_id_list_from_manifest(self.msdd_model.msdd_segmented_manifest_path)
         
         # Get the average embeddings for each session
-        
         for test_batch_idx, test_batch in enumerate(tqdm(self.msdd_model.test_dataloader(), desc="Computing average embeddings", leave=False)):
             ms_emb_seq, _, seq_lengths, clus_label_index, targets = test_batch
             batch_uniq_ids = all_manifest_uniq_ids[test_batch_idx * batch_size: (test_batch_idx+1) * batch_size]
@@ -1846,7 +1890,6 @@ class NeuralDiarizer(LightningModule):
             preds, _ = self.msdd_model.forward_infer(ms_emb_seq=ms_emb_seq, 
                                                      seq_lengths=seq_lengths, 
                                                      ms_avg_embs=ms_avg_embs)
-             
             preds_list.append(preds.detach().cpu())
             targets_list.append(targets.detach().cpu())
 
@@ -1864,8 +1907,7 @@ class NeuralDiarizer(LightningModule):
         base_shift = self.msdd_model.cfg.interpolated_scale/2 
         base_window = self.msdd_model.cfg.interpolated_scale
         self.msdd_uniq_id_segment_counts = {}
-        self.preds, self.targets, self.rep_counts = {}, {}, {}
-        self.scale_mapping = {} 
+        self.scale_mapping, self.preds, self.targets, self.rep_counts = {}, {}, {}, {}
         all_manifest_uniq_ids = get_uniq_id_list_from_manifest(self.msdd_model.msdd_segmented_manifest_path)
         ovl = int(self.msdd_model.diar_ovl_len / (self.msdd_model.cfg.interpolated_scale/2))-1
 

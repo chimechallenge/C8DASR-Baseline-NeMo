@@ -127,18 +127,22 @@ def prepare_chime6(
     dataset_name: str = "chime6",
 ) -> Dict[str, Dict[str, Union[RecordingSet, SupervisionSet]]]:
     """
-    Returns the manifests which consist of the Recordings and Supervisions
-    :param corpus_dir: Pathlike, the path of CHiME-6 main directory.
-    :param output_dir: Pathlike, the path where to write the manifests.
-    :param mic: str, the microphone type to use,
-    choose from "ihm" (close-talk) or "mdm"
-        (multi-microphone array) settings.
-        For MDM, there are 6 array devices with 4
-        channels each, so the resulting recordings will have 24 channels.
-    :param normalize_text: str, the text normalization method,
-    choose from "chime6" or "chime7".
-    """
+    Returns the manifests which consist of the recordings and supervisions.
 
+    Args:
+        corpus_dir: Pathlike, the path of CHiME-8 data directory.
+        output_dir: Pathlike, the path where to write the manifests.
+        subset: str, which part of the dataset you want for the manifests? 'train', 'dev' or 'eval'.
+        mic: str, the microphone type to use, choose from "ihm" (close-talk) or "mdm" (multi-microphone array) settings.
+        normalize_text: str, the text normalization method, choose from "chime6" or "chime7".
+        json_dir: Pathlike, alternative annotation e.g. from non-oracle diarization.
+        ignore_shorter: float, ignore segments that are shorter than this value in the supervision.
+        dataset_name: str, the name of the dataset.
+
+    Returns:
+        manifests (Dict[str, Dict[str, Union[RecordingSet, SupervisionSet]]]):
+            the manifests which consist of the recordings and supervisions.
+    """    
     assert mic in ["ihm", "mdm"], "mic must be either 'ihm' or 'mdm'."
     txt_normalization = choose_txt_normalization(normalize_text)
     transcriptions_dir = os.path.join(corpus_dir, "transcriptions_scoring") if json_dir is None else json_dir
@@ -148,6 +152,8 @@ def prepare_chime6(
         output_dir.mkdir(parents=True, exist_ok=True)
 
     all_sessions = [Path(x).stem for x in glob.glob(os.path.join(transcriptions_dir, subset, "*.json"))]
+    if len(all_sessions) == 0:
+        raise FileNotFoundError(f"No transcriptions found for subset {subset} in {transcriptions_dir}")
     manifests = defaultdict(dict)
     recordings = []
     supervisions = []
@@ -249,18 +255,22 @@ def prepare_notsofar1(
     dataset_name: str = "notsofar1",
 ) -> Dict[str, Dict[str, Union[RecordingSet, SupervisionSet]]]:
     """
-    Returns the manifests which consist of the Recordings and Supervisions
-    :param corpus_dir: Pathlike, the path of CHiME-6 main directory.
-    :param output_dir: Pathlike, the path where to write the manifests.
-    :param mic: str, the microphone type to use,
-    choose from "ihm" (close-talk) or "mdm"
-        (multi-microphone array) settings.
-        For MDM, there are 6 array devices with 4
-        channels each, so the resulting recordings will have 24 channels.
-    :param normalize_text: str, the text normalization method,
-    choose from "chime6" or "chime7".
-    """
+    Returns the manifests which consist of the recordings and supervisions.
 
+    Args:
+        corpus_dir: Pathlike, the path of CHiME-8 data directory.
+        output_dir: Pathlike, the path where to write the manifests.
+        subset: str, which part of the dataset you want for the manifests? 'train', 'dev' or 'eval'.
+        mic: str, the microphone type to use, choose from "ihm" (close-talk) or "mdm" (multi-microphone array) settings.
+        normalize_text: str, the text normalization method, choose from "chime6" or "chime7".
+        json_dir: Pathlike, alternative annotation e.g. from non-oracle diarization.
+        ignore_shorter: float, ignore segments that are shorter than this value in the supervision.
+        dataset_name: str, the name of the dataset.
+
+    Returns:
+        manifests (Dict[str, Dict[str, Union[RecordingSet, SupervisionSet]]]):
+            the manifests which consist of the recordings and supervisions.
+    """    
     assert mic in ["ihm", "mdm"], "mic must be either 'ihm' or 'mdm'."
     txt_normalization = choose_txt_normalization(normalize_text)
     transcriptions_dir = os.path.join(corpus_dir, "transcriptions_scoring") if json_dir is None else json_dir
@@ -270,6 +280,8 @@ def prepare_notsofar1(
         output_dir.mkdir(parents=True, exist_ok=True)
 
     all_sessions = [Path(x).stem for x in glob.glob(os.path.join(transcriptions_dir, subset, "*.json"))]
+    if len(all_sessions) == 0:
+        raise FileNotFoundError(f"No transcriptions found for subset {subset} in {transcriptions_dir}")
     recordings, supervisions = [], []
     # First we create the recordings
     for session in all_sessions:
@@ -346,17 +358,22 @@ def prepare_dipco(
     dataset_name: str = "dipco",
 ) -> Dict[str, Dict[str, Union[RecordingSet, SupervisionSet]]]:
     """
-    Returns the manifests which consist of the Recordings and Supervisions
-    :param corpus_dir: Pathlike, the path of DiPCo main directory.
-    :param output_dir: Pathlike, the path where to write the manifests.
-    :param mic: str, the microphone type to use,
-    choose from "ihm" (close-talk) or "mdm"
-        (multi-microphone array) settings.
-        For MDM, there are 5 array devices with 7
-        channels each, so the resulting recordings will have 35 channels.
-    :param normalize_text: str, the text normalization method,
-     choose from "chime6" or "chime7".
-    """
+    Returns the manifests which consist of the recordings and supervisions.
+
+    Args:
+        corpus_dir: Pathlike, the path of CHiME-8 data directory.
+        output_dir: Pathlike, the path where to write the manifests.
+        subset: str, which part of the dataset you want for the manifests? 'train', 'dev' or 'eval'.
+        mic: str, the microphone type to use, choose from "ihm" (close-talk) or "mdm" (multi-microphone array) settings.
+        normalize_text: str, the text normalization method, choose from "chime6" or "chime7".
+        json_dir: Pathlike, alternative annotation e.g. from non-oracle diarization.
+        ignore_shorter: float, ignore segments that are shorter than this value in the supervision.
+        dataset_name: str, the name of the dataset.
+
+    Returns:
+        manifests (Dict[str, Dict[str, Union[RecordingSet, SupervisionSet]]]):
+            the manifests which consist of the recordings and supervisions.
+    """    
     assert mic in ["ihm", "mdm"], "mic must be one of 'ihm' or 'mdm'"
     normalize_text_func = choose_txt_normalization(normalize_text)
     transcriptions_dir = os.path.join(corpus_dir, "transcriptions_scoring") if json_dir is None else json_dir
@@ -368,6 +385,8 @@ def prepare_dipco(
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
     all_sessions = glob.glob(os.path.join(transcriptions_dir, subset, "*.json"))
+    if len(all_sessions) == 0:
+        raise FileNotFoundError(f"No transcriptions found for subset {subset} in {transcriptions_dir}")
     all_sessions = [Path(x).stem for x in all_sessions]
     recordings, supervisions = [], []
     # First we create the recordings
@@ -467,6 +486,23 @@ def prepare_mixer6(
     ignore_shorter: Optional[float] = 0.2,
     dataset_name: str = "mixer6",
 ) -> Dict[str, Dict[str, Union[RecordingSet, SupervisionSet]]]:
+    """
+    Returns the manifests which consist of the recordings and supervisions.
+
+    Args:
+        corpus_dir: Pathlike, the path of CHiME-8 data directory.
+        output_dir: Pathlike, the path where to write the manifests.
+        subset: str, which part of the dataset you want for the manifests? 'train', 'dev' or 'eval'.
+        mic: str, the microphone type to use, choose from "ihm" (close-talk) or "mdm" (multi-microphone array) settings.
+        normalize_text: str, the text normalization method, choose from "chime6" or "chime7".
+        json_dir: Pathlike, alternative annotation e.g. from non-oracle diarization.
+        ignore_shorter: float, ignore segments that are shorter than this value in the supervision.
+        dataset_name: str, the name of the dataset.
+
+    Returns:
+        manifests (Dict[str, Dict[str, Union[RecordingSet, SupervisionSet]]]):
+            the manifests which consist of the recordings and supervisions.
+    """    
     assert mic in ["ihm", "mdm"], "mic must be one of 'ihm' or 'mdm'"
     if mic == "ihm":
         assert subset in ["train_intv", "train_call", "dev",], "No close-talk microphones on evaluation set."
@@ -481,6 +517,8 @@ def prepare_mixer6(
         output_dir.mkdir(parents=True, exist_ok=True)
 
     all_sessions = glob.glob(os.path.join(transcriptions_dir, subset, "*.json"))
+    if len(all_sessions) == 0:
+        raise FileNotFoundError(f"No transcriptions found for subset {subset} in {transcriptions_dir}")
     all_sessions = [Path(x).stem for x in all_sessions]
     audio_files = glob.glob(os.path.join(corpus_dir, "audio", subset, "*.flac"))
     assert len(audio_files) > 0, f"Can't parse mixer6 audio files, is the path correct ?"
@@ -578,13 +616,9 @@ def prepare_mixer6(
                 )
             )
 
-    try:
-        recording_set, supervision_set = fix_manifests(
-            RecordingSet.from_recordings(recordings), SupervisionSet.from_segments(supervisions),
-        )
-    except:
-        import ipdb; ipdb.set_trace()
-
+    recording_set, supervision_set = fix_manifests(
+        RecordingSet.from_recordings(recordings), SupervisionSet.from_segments(supervisions),
+    )
     # Fix manifests
     validate_recordings_and_supervisions(recording_set, supervision_set)
 

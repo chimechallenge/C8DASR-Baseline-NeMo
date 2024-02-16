@@ -369,7 +369,7 @@ def score(
 
     if not (h_sess2segs.keys() == r_sess2segs.keys()):
         if allow_subset_eval:
-            ### To make subset evaluation without errors
+            # To make subset evaluation without errors
             r_sess2segs_new = {}
             for key in r_sess2segs.keys():
                 if key in intersection_list:
@@ -529,12 +529,9 @@ def run_chime_evaluation(cfg):
                 os.path.join(eval_cfg.dasr_root, scenario, "transcriptions_scoring", eval_cfg.partition, "*.json",)
             )
             uem = os.path.join(eval_cfg.dasr_root, scenario, "uem", eval_cfg.partition, "all.uem")
-            try:
-                assert len(reference_json) > 0, "Reference JSONS not found, is the path {} correct ?".format(
+            assert len(reference_json) > 0, "Reference JSONS not found, is the path {} correct ?".format(
                 os.path.join(eval_cfg.dasr_root, scenario, "transcriptions_scoring", eval_cfg.partition, "*.json",)
             )
-            except:
-                import ipdb; ipdb.set_trace() 
             scenario_stats, all_sess_stats, all_spk_stats = score(
                 hyp_json,
                 reference_json,
