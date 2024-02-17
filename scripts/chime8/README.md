@@ -18,9 +18,8 @@
 - libsndfile1 ffmpeg packages installed:
   - `apt-get update && apt-get install -y libsndfile1 ffmpeg`
 
-# Steps to Run Baseline System
 
-## 1. Package Installation
+##  Installation
 
 Git clone this repository: 
 
@@ -29,21 +28,6 @@ git clone https://github.com/chimechallenge/C8DASR-Baseline-NeMo
 ```
 
 Create a new conda environment and install the latest Pytorch stable version (2.2.0):
-```bash
-conda activate chime8_baseline
-pip uninstall -y 'cupy-cuda118'
-pip install --no-cache-dir -f https://pip.cupy.dev/pre/ "cupy-cuda11x[all]==12.1.0"
-pip install git+http://github.com/desh2608/gss
-pip install optuna
-pip install optuna-fast-fanova gunicorn
-pip install optuna-dashboard
-pip install lhotse==1.14.0
-pip install --upgrade jiwer
-pip install cmake>=3.18
-./run_install_lm.sh "/your/path/to/C8DASR_NeMo"
-```
-
-If you have `cupy-cuda118` installed, uninstall it.
 
 ```bash
 cd C8DASR-Baseline-NeMo
@@ -52,14 +36,14 @@ conda activate c8dasr
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 ```
 
-Install NeMo: `/path/to/C8DASR-Baseline-NeMo` is a path where you clone this repository.
+Install locally NeMo using this repository:
 ```bash
-cd /path/to/C8DASR-Baseline-NeMo
+cd C8DASR-Baseline-NeMo
 pip install Cython
 ./reinstall.sh
 ```
 
-Go to this folder and install the additional dependencies: 
+Then go to this folder and install the additional dependencies for this recipe: 
 
 ```bash
 cd scripts/chime8 
@@ -69,124 +53,97 @@ cd scripts/chime8
 ✅ You are ready to go ! <br>
 
 ⚠️ If you encountered any problems please see the [trouble shooting page](./docs/trouble_shooting.md), 
-feel free to raise an issue or [contact us](#contact).
+feel free to raise an issue or [contact us](#reach_us).
 
 
-### Launching NeMo CHiME-8 Baseline Inference
+### <a id="reach_us">Any Question/Problem ? Reach us !</a>
 
-We provide an end-to-end script for data generation and inference with the pre-trained baseline NeMo models: 
-`pipeline/launch_inference.sh`.
+If you are considering participating or just want to learn more then please join the <a href="https://groups.google.com/g/chime5/">CHiME Google Group</a>. <br>
+We have also a [CHiME Slack Workspace][slack-invite], join the `chime-8-dasr` channel there or contact us directly.<br>
+
+
+## DASR Data Download and Generation
+
+Data generation is handled here using [chime-utils](https://github.com/chimechallenge/chime-utils). <br>
+If you are **only interested in obtaining the data** you should use [chime-utils](https://github.com/chimechallenge/chime-utils) directly. <br>
+
+*Data generation and downloading is also done automatically in this recipe in stage 0**. <br> 
+You can skip it if you have already the data. <br>
+Note that Mixer 6 Speech has to be obtained via LDC. See [official challenge website](https://www.chimechallenge.org/current/task1/data) for how to obtain Mixer 6. <br>
+CHiME-6, DiPCo and NOTSOFAR1 will be downloaded automatically.
+
+
+## 📊 Results
+
+As explained in [official challenge website](https://www.chimechallenge.org/current/task1/index) this year
+systems will be ranked according to macro tcpWER [5] across the 4 scenarios (5 s collar). <br>
+
+```
+###############################################################################                                                                                                                                                         
+### tcpWER for all Scenario ###################################################                                                                                                                                                         
+###############################################################################                                                                                                                                                         
++-----+--------------+--------------+----------+----------+--------------+-------------+-----------------+------------------+------------------+------------------+        
+|     | session_id   |   error_rate |   errors |   length |   insertions |   deletions |   substitutions |   missed_speaker |   falarm_speaker |   scored_speaker |        
+|-----+--------------+--------------+----------+----------+--------------+-------------+-----------------+------------------+------------------+------------------|        
+| dev | chime6       |     0.581619 |    36692 |    63086 |         5443 |       25901 |            5348 |                1 |                0 |                8 |        
+| dev | mixer6       |     0.253877 |    23489 |    92521 |         3891 |       10289 |            9309 |                0 |                0 |               70 |        
+| dev | dipco        |     0.667171 |    11454 |    17168 |         2197 |        7036 |            2221 |                1 |                0 |                8 |        
+| dev | notsofar1    |     0.735385 |   131042 |   178195 |         9731 |      110923 |           10388 |              298 |                0 |              592 |                                                                     
++-----+--------------+--------------+----------+----------+--------------+-------------+-----------------+------------------+------------------+------------------+                                                                     
+###############################################################################                                                                                                                                                         
+### Macro-Averaged tcpWER for across all Scenario (Ranking Metric) ############                                                                                                                                                         
+###############################################################################                                                                                                                                                         
++-----+--------------+                                                                                                                                                                                                                  
+|     |   error_rate |                                                                                                                                                                                                                  
+|-----+--------------|                                                                                                                                                                                                                  
+| dev |     0.559513 |                                                                                                                                                                                                                  
++-----+--------------+  
+```
+
+## Reproducing the Baseline Results
+
+### Inference
+
+If you want to perform inference with the pre-trained models. <br>
+We provide an end-to-end script for data generation and inference with the [pre-trained baseline NeMo models](https://huggingface.co/chime-dasr/nemo_baseline_models/tree/main): 
+`pipeline/launch_inference.sh`. <br>
+By default, the scripts hereafter will perform inference on dev set of all 4 scenarios: CHiME-6, DiPCo, Mixer 6 and NOTSOFAR1. <br>
+To limit e.g. only to CHiME-6 and DiPCo you can pass this option:
+
+`--SCENARIOS "[chime6,dipco]"`
+
+You can also resume the inference at intermediate stages: 
+- `--STAGE 0` data download and generation
+- `--STAGE 1` diarization
+- `--STAGE 2` guided source separation
+- `--STAGE 3` ASR
+- `--STAGE 4` scoring
+
+## Launching NeMo CHiME-8 Baseline Inference
+
+If you have already generated the data via [chime-utils](https://github.com/chimechallenge/chime-utils) and the data is in `/path/to/chime8_dasr`:
 
 ```bash
-./pipeline/launch_inference.sh --DOWNLOAD_ROOT <YOUR_DOWNLOAD_DIR> --MIXER6_ROOT <YOUR_MIXER6_DIR> 
+./run.sh --CHIME_DATA_ROOT /path/to/chime8_dasr --STAGE 1
 ```
 
 
-### Data Generation
-
-Please find the data preparation scripts at chime-utils repository [CHiME Challenge Utils: github.com/chimechallenge/chime-utils](https://github.com/chimechallenge/chime-utils).
-You will provide a folder containing datasets and annotations as follows.
-```
-CHIME_DATA_ROOT=/path/to/chime8_official_cleaned
-```
-
-After you finish the dataset preparation, the following needes to be placed in the directory `chime8_official_cleaned`.
-```
-chime8_official_cleaned/
-├── chime6/
-├── dipco/
-├── mixer6/
-└── notsofar1/
-```
-### Model Download 
-
-Prepare the four model files as followings in the `CHECKPOINTS` folder:
-```
-VAD_MODEL_PATH=${CHECKPOINTS}/MarbleNet_frame_VAD_chime7_Acrobat.nemo
-MSDD_MODEL_PATH=${CHECKPOINTS}/MSDD_v2_PALO_100ms_intrpl_3scales.nemo
-ASR_MODEL_PATH=${CHECKPOINTS}/FastConformerXL-RNNT-chime7-GSS-finetuned.nemo
-LM_MODEL_PATH=${CHECKPOINTS}/ASR_LM_chime7_only.kenlm 
-```
-These four models can be downloaded from Hugging Face, CHiME-DASR Repository:   
-[HuggingFace: NeMo Baseline Models](https://huggingface.co/chime-dasr/nemo_baseline_models)
-
-## 2. Setup Global Varialbes
-
-Use the main inference script: `<NeMo Root>/scripts/chime8/pipeline/inference.py`
-
-You need to fill the paths to the following variables.
-Make sure to setup your CHIME8 Data path, temporary directory with write permissions and NeMo root path where NeMo toolkit is cloned.
-
-```python
-NEMO_ROOT=/path/to/NeMo 
-CHECKPOINTS=/path/to/checkpoints
-TEMP_DIR=/temp/path/to/chime8_baseline_tempdir
-CHIME_DATA_ROOT=/path/to/chime8_official_cleaned
-SCENARIOS="[mixer6,chime6,dipco,notsofar1]"
-DIAR_CONFIG="chime8-baseline-all-4"
-```
-
-## 3. Launch CHiME-8 Baseline 
-
-Before launch the following script, make sure to activate your Conda environment.
-```bash
-conda activate chime8_baseline
-```
-
-Launch the following script after plugging in all the varialbes needed.
+If you need to generate the data yet.
+CHiME-6, DiPCo and NOTSOFAR1 will be downloaded automatically. Ensure you have ~1TB of space in a path of your choice `/your/path/to/download`. <br>
+Mixer 6 Speech has to be obtained via LDC and unpacked in a directory of your choice `/your/path/to/mixer6_root`. <br>
+Data will be generated in `/your/path/to/chime8_dasr` again choose the most convenient location for you.
 
 ```bash
-###########################################################################
-### YOUR CUSTOMIZED CONFIGURATIONS HERE ###################################
-NEMO_ROOT=/path/to/C8DASR-Baseline-NeMo # Cloned NeMo folder 
-CHECKPOINTS=/path/to/checkpoints
-TEMP_DIR=/temp/path/to/chime8_baseline_tempdir
-CHIME_DATA_ROOT=/path/to/chime8_official_cleaned
-SCENARIOS="[mixer6,chime6,dipco,notsofar1]"
-DIAR_CONFIG="chime8-baseline-all-4"
-MAX_NUM_SPKS=8 
-STAGE=0 # [stage 0] diarization [stage 1] GSS [stage 2] ASR [stage 3] scoring
-###########################################################################
-cd $NEMO_ROOT
-export CUDA_VISIBLE_DEVICES="0"
-
-python -c "import kenlm; print('kenlm imported successfully')" || exit 1
-
-SCRIPT_NAME=${NEMO_ROOT}/scripts/chime8/pipeline/inference.py
-CONFIG_PATH=${NEMO_ROOT}/scripts/chime8/pipeline/confs
-YAML_NAME="chime_config.yaml"
-
-VAD_MODEL_PATH=${CHECKPOINTS}/MarbleNet_frame_VAD_chime7_Acrobat.nemo
-MSDD_MODEL_PATH=${CHECKPOINTS}/MSDD_v2_PALO_100ms_intrpl_3scales.nemo
-ASR_MODEL_PATH=${CHECKPOINTS}/FastConformerXL-RNNT-chime7-GSS-finetuned.nemo
-LM_MODEL_PATH=${CHECKPOINTS}/ASR_LM_chime7_only.kenlm 
-
-SITE_PACKAGES=`$(which python) -c 'import site; print(site.getsitepackages()[0])'`
-export KENLM_ROOT=$NEMO_ROOT/decoders/kenlm
-export KENLM_LIB=$NEMO_ROOT/decoders/kenlm/build/bin
-export PYTHONPATH=$NEMO_ROOT/decoders:$PYTHONPATH
-export PYTHONPATH=$SITE_PACKAGES/kenlm-0.2.0-py3.10-linux-x86_64.egg:$PYTHONPATH
-export PYTHONPATH=$NEMO_ROOT:$PYTHONPATH
-
-python ${SCRIPT_NAME} --config-path="${CONFIG_PATH}" --config-name="$YAML_NAME" \
-stage=${STAGE} \
-diar_config=${DIAR_CONFIG} \
-max_num_spks=${MAX_NUM_SPKS} \
-chime_data_root=${CHIME_DATA_ROOT} \
-output_root=${TEMP_DIR} \
-scenarios=${SCENARIOS} \
-subsets="[dev]" \
-asr_model_path=${ASR_MODEL_PATH} \
-lm_model_path=${LM_MODEL_PATH} \
-diarizer.vad.model_path=${VAD_MODEL_PATH} \
-diarizer.msdd_model.model_path=${MSDD_MODEL_PATH} \
+./run.sh --CHIME_DATA_ROOT  /path/to/chime8_dasr \
+--DOWNLOAD_ROOT /your/path/to/download \
+--MIXER6_ROOT /your/path/to/mixer6_root \
+--stage 0 
 ```
 
 
-<h3>📩 Contact Us/Stay Tuned</h3>
-If you need help, we have also a [CHiME Slack Workspace][slack-invite], you can join the **chime-8-dasr channel** there or contact the organizers directly.
-Consider also to join the <a href="https://groups.google.com/g/chime5/">CHiME Google Group</a>. <br>
-Please join these two if you plan to participate in this challenge in order to stay updated. 
+
+
+
 
 [slack-badge]: https://img.shields.io/badge/slack-chat-green.svg?logo=slack
 [slack-invite]: https://join.slack.com/t/chime-fey5388/shared_invite/zt-1oha0gedv-JEUr1mSztR7~iK9AxM4HOA

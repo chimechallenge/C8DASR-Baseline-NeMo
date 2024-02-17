@@ -13,9 +13,10 @@ STOP_STAGE=0
 SCENARIOS="[chime6,dipco,mixer6,notsofar1]"
 DIAR_CONFIG="chime8-baseline-mixer6-short1"
 ###########################################################################
-cd $NEMO_ROOT
 
-export CUDA_VISIBLE_DEVICES="0"
+. ./utils/parse_options.sh
+
+cd $NEMO_ROOT
 
 SCRIPT_NAME=${NEMO_ROOT}/scripts/chime8/pipeline/inference.py
 python -c "import kenlm; print('kenlm imported successfully')" || exit 1
