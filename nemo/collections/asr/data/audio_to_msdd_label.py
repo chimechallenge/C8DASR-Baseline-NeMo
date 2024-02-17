@@ -15,7 +15,7 @@
 import os
 from collections import OrderedDict
 from statistics import mode
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Union, Tuple, Optional
 import pickle
 
 import torch
@@ -402,7 +402,6 @@ class _AudioMSDDTrainDataset(Dataset):
         super().__init__()
         self.collection = DiarizationSpeechLabel(
             manifests_files=manifest_filepath.split(','),
-            # emb_dict=None,
             clus_label_dict=None,
             pairwise_infer=pairwise_infer,
         )
@@ -750,6 +749,7 @@ class _AudioMSDDInferDataset(Dataset):
         use_single_scale_clus: bool,
         pairwise_infer: bool,
         mc_late_fusion: bool = False,
+        uniq_id: str = None,
     ):
         super().__init__()
         self.collection = DiarizationSpeechLabel(
@@ -757,6 +757,7 @@ class _AudioMSDDInferDataset(Dataset):
             clus_label_dict=clus_label_dict,
             seq_eval_mode=seq_eval_mode,
             pairwise_infer=pairwise_infer,
+            uniq_id=uniq_id,
         )
         self.manifest_filepath = manifest_filepath
         self.emb_seq = emb_seq
@@ -771,6 +772,7 @@ class _AudioMSDDInferDataset(Dataset):
         self.seq_eval_mode = seq_eval_mode
         self.session_len_sec = session_len_sec
         self.original_audio_offsets = original_audio_offsets
+        self.uniq_id = uniq_id
 
         self.multiscale_args_dict = multiscale_args_dict 
         self.scale_n = len(self.multiscale_args_dict['scale_dict'])
@@ -1197,6 +1199,7 @@ class AudioToSpeechMSDDInferDataset(_AudioMSDDInferDataset):
         window_stride: float,
         pairwise_infer: bool,
         mc_late_fusion: bool,
+        uniq_id: Union[str, list] = None,
     ):
         super().__init__(
             manifest_filepath=manifest_filepath,
@@ -1213,6 +1216,7 @@ class AudioToSpeechMSDDInferDataset(_AudioMSDDInferDataset):
             seq_eval_mode=seq_eval_mode,
             pairwise_infer=pairwise_infer,
             mc_late_fusion=mc_late_fusion,
+            uniq_id=uniq_id,
         )
 
     def msdd_infer_collate_fn(self, batch):

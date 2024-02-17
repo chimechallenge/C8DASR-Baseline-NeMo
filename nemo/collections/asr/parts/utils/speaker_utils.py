@@ -530,8 +530,6 @@ def get_cluster_labels_infer(
     scale_map: torch.Tensor,
     base_scale_idx: int,
     ):
-
-
     # Convert cluster labels to the finest scale
     clus_labels_infer_org_scale = torch.zeros(ms_silsp_embs.shape[0]+1)
     clus_labels_infer_org_scale[:vad_decision_scaled.shape[0]][vad_decision_scaled] = (cluster_labels + 1).float().to(ms_silsp_embs.device)
@@ -584,7 +582,6 @@ def get_ms_embs_and_ts(
     """
     rep_counts = torch.unique(scale_map[base_scale_idx], return_counts=True)[1]
     base_seg_inds = torch.cumsum(rep_counts, dim=0) - 1 # Pick the last index of each repeating index
-
     ms_silsp_embs = embeddings[:, :(base_scale_idx+1), :][base_seg_inds, :, :] # [T, num_scales, emb_dim, (num_of_channels)]
     ms_ts_scaled = time_stamps[base_scale_idx][base_seg_inds]/feat_per_sec
     vad_index_list = [0] + (base_seg_inds + 1).tolist() # selected scale's T + 1
@@ -697,6 +694,123 @@ def get_selected_channel_embs(
         selected_ss_mc_embs = ms_cat_emb_seq.reshape(ms_emb_seq.shape[0], ms_emb_seq.shape[1], ms_emb_seq.shape[2], ms_cat_emb_seq.shape[-1])
     return selected_ss_mc_embs
 
+def perform_clustering_session_embs(
+    uniq_id: str,
+    embeddings: torch.Tensor,
+    time_stamps: torch.Tensor,
+    vad_probs: torch.Tensor,   
+    scale_map: torch.Tensor,
+    audio_rttm_values: dict,
+    out_rttm_dir: str,
+    clustering_params: omegaconf.DictConfig,
+    multiscale_weights: list,
+    device: torch.device,
+    vad_threshold: float,
+    multiscale_dict: dict, 
+    verbose: bool = True,
+    drop_length_thres = 4500,
+    feat_per_sec: int = 100,
+    long_audio_thres: int = 100000,
+    get_rttm_with_the_finest_scale: bool = True,
+    cuda: bool = True,
+):
+    lines_cluster_labels, all_hypothesis, all_reference = [], [], []
+    no_references = False
+
+    if len(embeddings.shape) > 3: # If multi-channel case
+        time_stamps = time_stamps[:, :, :, 0]
+    base_scale_idx = clustering_params.clustering_scale_index
+    if device.type != 'cuda':
+        if verbose:
+            logging.warning("cuda=False, using CPU for eigen decomposition. This might slow down the clustering process.")
+        cuda = False
+    speaker_clustering = SpeakerClustering(cuda=cuda)
+    if scale_map.shape[1] > long_audio_thres:
+        if verbose:
+            logging.info(f"[Speaker Clustering] Long form audio detected: Using {base_scale_idx}-index scale length {multiscale_dict[base_scale_idx]} Segment Count - {scale_map.shape[1]}")
+        base_scale_idx = max(0, base_scale_idx - 1)
+    else:
+        if verbose:
+            logging.info(f"[Speaker Clustering] Short form audio detected: Segment Count - {scale_map.shape[1]}")
+    
+    ms_silsp_embs, ms_embs_scaled_vadmasked, ms_ts_scaled, vad_decision_scaled, vad_decision_base = get_ms_embs_and_ts(base_scale_idx, 
+                                                                                                                        embeddings, 
+                                                                                                                        time_stamps, 
+                                                                                                                        scale_map, 
+                                                                                                                        vad_probs, 
+                                                                                                                        vad_threshold,
+                                                                                                                        feat_per_sec)
+    if len(ms_embs_scaled_vadmasked.shape) > 3: # This is multi-channel case
+        selected_ss_mc_embs = get_selected_channel_embs(
+            ms_embs_scaled_vadmasked, 
+            max_mc_ch_num=clustering_params.max_mc_ch_num, 
+            collapse_scale_dim=True,
+            multiscale_weights=multiscale_weights, 
+            )
+    else:
+        multiscale_weights_tensor = torch.tensor(multiscale_weights).float().unsqueeze(0).unsqueeze(-1)
+        selected_ss_mc_embs = (ms_embs_scaled_vadmasked * multiscale_weights_tensor[:, :ms_embs_scaled_vadmasked.shape[1]]).sum(dim=1)
+    
+    if clustering_params.oracle_num_speakers:
+        num_speakers = audio_rttm_values.get('num_speakers', None)
+        if num_speakers is None:
+            raise ValueError("Provided option as oracle num of speakers but num_speakers in manifest is null")
+    else:
+        num_speakers = -1
+        
+    drop_length_thres_scaled = get_scaled_drop_length_thres(drop_length_thres, 
+                                                            base_scale_idx, 
+                                                            clustering_params.clustering_scale_index, 
+                                                            multiscale_dict)
+    
+    cluster_labels = speaker_clustering.forward_embs(
+            embs=selected_ss_mc_embs,
+            oracle_num_speakers=int(num_speakers),
+            max_num_speakers=int(clustering_params.max_num_speakers),
+            min_num_speakers=int(clustering_params.get('min_num_speakers', 1)),
+            max_rp_threshold=float(clustering_params.max_rp_threshold),
+            sparse_search_volume=int(clustering_params.sparse_search_volume),
+            drop_length_thres=drop_length_thres_scaled,
+            reclus_aff_thres=float(clustering_params.get('reclus_aff_thres', 0.85)),
+        )
+    
+    cluster_labels_infer, max_scm = get_cluster_labels_infer(ms_silsp_embs, 
+                                                                cluster_labels, 
+                                                                vad_decision_scaled, 
+                                                                vad_decision_base, 
+                                                                scale_map, 
+                                                                base_scale_idx)
+    if cuda:
+        torch.cuda.empty_cache()
+    else:
+        gc.collect()
+
+    del ms_embs_scaled_vadmasked, ms_silsp_embs, selected_ss_mc_embs, ms_ts_scaled, vad_decision_scaled, vad_decision_base
+    if get_rttm_with_the_finest_scale: 
+        timestamps = time_stamps[-1][:max_scm][cluster_labels_infer != -1]/feat_per_sec
+        cluster_labels = cluster_labels_infer[cluster_labels_infer != -1].cpu().numpy()
+    else:
+        timestamps = ms_ts_scaled[vad_decision_scaled, :] 
+        cluster_labels = cluster_labels.cpu().numpy()
+    
+    if len(cluster_labels) != timestamps.shape[0]:
+        raise ValueError("Mismatch of length between cluster_labels and timestamps.")
+    labels, lines = generate_cluster_labels(timestamps, cluster_labels)
+    if out_rttm_dir:
+        labels_to_rttmfile(labels, uniq_id, out_rttm_dir)
+        lines_cluster_labels.extend([f'{uniq_id} {seg_line}\n' for seg_line in lines])
+    hypothesis = labels_to_pyannote_object(labels, uniq_name=uniq_id)
+    hyp_entry = [uniq_id, hypothesis]
+    rttm_file = audio_rttm_values.get('rttm_filepath', None)
+    if rttm_file is not None and os.path.exists(rttm_file) and not no_references:
+        ref_labels = rttm_to_labels(rttm_file)
+        reference = labels_to_pyannote_object(ref_labels, uniq_name=uniq_id)
+        ref_entry = [uniq_id, reference]
+    else:
+        no_references = True
+        ref_entry = []
+    return ref_entry, hyp_entry, cluster_labels_infer
+
 def perform_clustering_embs(
     embeddings_dict: Dict[str, torch.Tensor],
     time_stamps_dict: Dict[str, torch.Tensor],
@@ -713,7 +827,6 @@ def perform_clustering_embs(
     drop_length_thres = 4500,
     feat_per_sec: int = 100,
     long_audio_thres: int = 100000,
-    unit_clus_len: int = 1000,
     get_rttm_with_the_finest_scale: bool = True,
     cuda: bool = True,
 ):
@@ -1979,7 +2092,7 @@ def generate_diarization_output_lines(speaker_timestamps, model_spk_num):
             speaker_lines_total.extend([f"{ts_interval[0]:.3f} {ts_interval[1]:.3f} speaker_{int(spk_idx)}"])
     return speaker_lines_total
         
-def get_uniq_id_list_from_manifest(manifest_file: str):
+def get_uniq_id_list_from_manifest(manifest_file: str, white_uniq_id: str = None):
     """Retrieve `uniq_id` values from the given manifest_file and save the IDs to a list.
     """
     uniq_id_list = []
@@ -1991,7 +2104,10 @@ def get_uniq_id_list_from_manifest(manifest_file: str):
                 uniq_id = dic['uniq_id']
             else:
                 uniq_id = get_uniqname_from_filepath(dic['audio_filepath'])
-            uniq_id_list.append(uniq_id)
+            if white_uniq_id is not None and uniq_id != white_uniq_id:
+                continue
+            else:
+                uniq_id_list.append(uniq_id)
     return uniq_id_list
 
 

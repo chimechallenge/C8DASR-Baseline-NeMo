@@ -781,11 +781,11 @@ class DiarizationSpeechLabel(DiarizationLabel):
     def __init__(
         self,
         manifests_files: Union[str, List[str]],
-        # emb_dict: Dict,
         clus_label_dict: Dict,
         round_digit=2,
         seq_eval_mode=False,
         pairwise_infer=False,
+        uniq_id: str=None,
         *args,
         **kwargs,
     ):
@@ -812,7 +812,6 @@ class DiarizationSpeechLabel(DiarizationLabel):
             **kwargs: Kwargs to pass to `SpeechLabel` constructor.
         """
         self.round_digit = round_digit
-        # self.emb_dict = emb_dict
         self.clus_label_dict = clus_label_dict
         self.seq_eval_mode = seq_eval_mode
         self.pairwise_infer = pairwise_infer
@@ -829,6 +828,8 @@ class DiarizationSpeechLabel(DiarizationLabel):
         )
 
         for item in manifest.item_iter(manifests_files, parse_func=self.__parse_item_rttm):
+            if uniq_id is not None and item['uniq_id'] != uniq_id:
+                continue
             # Inference mode
             self.pairwise_infer = False
             if self.pairwise_infer:
