@@ -10,7 +10,7 @@ MIXER6_ROOT=/raid/users/popcornell/mixer6 # you have to put yours
 DGEN_SPLITS="train,dev" # which datasets splits you want to generate, note that evaluation will be available later.
 STAGE=0 # stage 0 downloads the checkpoints and does data generation. inference starts at stage 1.
 STOP_STAGE=0
-SCENARIOS="[chime6,dipco,mixer6]"
+SCENARIOS="[chime6,dipco,mixer6,notsofar1]"
 DIAR_CONFIG="chime8-baseline-mixer6-short1"
 ###########################################################################
 cd $NEMO_ROOT
