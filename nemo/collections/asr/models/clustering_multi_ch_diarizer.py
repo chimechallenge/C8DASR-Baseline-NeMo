@@ -41,6 +41,7 @@ from nemo.collections.asr.models.multi_classification_models import EncDecMultiC
 from nemo.collections.asr.parts.utils.speaker_utils import (
     parse_scale_configs,
     perform_clustering_embs,
+    perform_clustering_session_embs,
     segments_manifest_to_subsegments_manifest,
     get_uniq_id_list_from_manifest,
 )
@@ -203,7 +204,6 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
         ms_emb_seq has dimension: (batch_size, time_steps, scale_n, emb_dim)
 
         """
-        # self._setup_diarizer_validation_data(manifest_file)
         self._diarizer_model.msdd.eval()
         self._diarizer_model.msdd._speaker_model.eval()
         self._diarizer_model.msdd._vad_model.eval()
@@ -412,7 +412,6 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
                         
                 # Check if the last segment is truncated 
                 if total_count == len(all_manifest_uniq_ids)-1 or all_manifest_uniq_ids[total_count+1] != uniq_id: # If the last window
-                    # batch_manifest[sample_id]['duration'] < self._diarizer_model.cfg.session_len_sec:
                     last_window_flag = True
                     last_trunc_index = int(np.ceil((batch_manifest[sample_id]['duration']-base_window)/base_shift))
                     embs_add = embs[sample_id][(ovl+1):last_trunc_index]
@@ -451,7 +450,7 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
                             self._save_extracted_data(uniq_id, is_multi_channel, save_embs=save_embs)
                     else:
                         # Assign the actual length of the last segment to the truncated segment
-                        print(f"Truncated - batch_idx: {batch_idx} sample_id {sample_id} ts_add.shape {ts_add.shape} Truncating last segment of uniq_id: {uniq_id}")
+                        logging.info(f"Truncated - batch_idx: {batch_idx} sample_id {sample_id} ts_add.shape {ts_add.shape} Truncating last segment of uniq_id: {uniq_id}")
                         self._diarizer_model.uniq_id_segment_counts[uniq_id] = self.uniq_id_segment_counts[uniq_id]
                 else:
                     self.uniq_id_segment_counts[uniq_id] = 1
@@ -499,6 +498,29 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
             loaded_dict[uniq_id] = pkl.load(open(path_name, 'rb'))
         return loaded_dict 
     
+    def _load_uniq_id_tensor(self, uniq_id: str, data_type_name: str, multi_ch_mode: bool, check_exist=False):
+        """
+        Load a specific pickle file specified by the uniq_id.
+        """
+        embedding_hash, dataset_hash = self.get_hash_from_settings()
+        mc_str = '_mc' if multi_ch_mode else ''
+        tensor_dir = os.path.join(self._speaker_dir, f"{embedding_hash}_{dataset_hash}{mc_str}")
+        base_path_name = os.path.join(tensor_dir, data_type_name)
+        full_path = os.path.join(base_path_name, f'ext_{data_type_name}_{uniq_id}.pkl')
+        if check_exist:
+            if not os.path.exists(full_path):
+                return False
+            else:
+                return True
+        loaded_tensor = pkl.load(open(full_path, 'rb'))
+        logging.info(f"Loaded {data_type_name} pickle file for {uniq_id} from {full_path}")
+        if isinstance(loaded_tensor, list): 
+            if data_type_name in ["embeddings", "vad_probs"]:
+                 loaded_tensor = torch.cat(loaded_tensor, dim=0)
+            elif data_type_name == "time_stamps":
+                loaded_tensor = torch.cat(loaded_tensor, dim=1)
+        return loaded_tensor
+    
     def delete_mc_embeddings(self):
         embedding_hash, dataset_hash = self.get_hash_from_settings()
         tensor_dir = os.path.join(self._speaker_dir, f"{embedding_hash}_{dataset_hash}_mc")
@@ -529,6 +551,15 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
                 raise ValueError(f"uniq_id {uniq_id} has a dimension mismatch between embeddings and time stamps")
         return embeddings, time_stamps, vad_probs
     
+    def _check_extracted_tensors_exist(self, is_multi_channel=True):
+        for uniq_id in self.AUDIO_RTTM_MAP.keys():
+            bool_embeddings = self._load_uniq_id_tensor(uniq_id, 'embeddings', multi_ch_mode=is_multi_channel, check_exist=True)
+            bool_vad_probs = self._load_uniq_id_tensor(uniq_id, 'vad_probs', multi_ch_mode=False, check_exist=True)
+            bool_time_stamps = self._load_uniq_id_tensor(uniq_id, 'time_stamps', multi_ch_mode=is_multi_channel, check_exist=True)
+            if not (bool_embeddings and bool_vad_probs and bool_time_stamps):
+                return False
+        return True
+    
     def forward(self, batch_size: int = None, mc_input=False):
         """
         Forward pass for end-to-end (including end-to-end optimized models) diarization.
@@ -543,10 +574,8 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
         """
         self.maxlen_time_stamps, self.maxlen_scale_map = self._setup_diarizer_validation_data(manifest_file=self._diarizer_params.manifest_filepath)
         embedding_hash, dataset_hash = self.get_hash_from_settings()     
-        tensor_dir = os.path.join(self._speaker_dir, f"{embedding_hash}_{dataset_hash}")
-        if self._diarizer_params.use_saved_embeddings and os.path.exists(tensor_dir):
-            logging.info(f"Pre-loaded embedding vectors exist: Loading embeddings from {tensor_dir}")
-            embeddings, time_stamps, vad_probs = self.load_extracted_tensors(embedding_hash, dataset_hash, mc_input=mc_input, is_mc_encoding=False)
+        if self._check_extracted_tensors_exist(is_multi_channel=True):
+            embeddings, time_stamps, vad_probs = {}, {}, {}
         else:
             embeddings, time_stamps, vad_probs = self._forward_speaker_encoder(manifest_file=self._diarizer_params.manifest_filepath,
                                                                                batch_size=batch_size)
@@ -576,10 +605,8 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
         """
         self.maxlen_time_stamps, self.maxlen_scale_map = self._setup_diarizer_validation_data(manifest_file=self._diarizer_params.manifest_filepath)
         embedding_hash, dataset_hash = self.get_hash_from_settings()     
-        mc_tensor_dir = os.path.join(self._speaker_dir, f"{embedding_hash}_{dataset_hash}_mc")
-        if self._diarizer_params.use_saved_embeddings and os.path.exists(mc_tensor_dir):
-            logging.info(f"Pre-loaded Multi-channel embedding vectors exist: Loading embeddings from {mc_tensor_dir}")
-            mc_embeddings, mc_time_stamps, _ = self.load_extracted_tensors(embedding_hash, dataset_hash, mc_input=True, is_mc_encoding=True)
+        if self._check_extracted_tensors_exist(is_multi_channel=True):
+            mc_embeddings, mc_time_stamps = {}, {}
         else:
             mc_embeddings, mc_time_stamps = self._forward_speaker_encoder_multi_channel(manifest_file=self._diarizer_params.manifest_filepath,
                                                                                             batch_size=batch_size)
@@ -588,19 +615,39 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
             scale_mapping[uniq_id] = self.maxlen_scale_map.squeeze(0)[:, :mc_time_stamps[uniq_id].shape[1]]
         mc_session_clus_labels = {}
         mono_vad_probs = self._diarizer_model.mono_vad_probs
-        clus_labels = self._run_clustering(embeddings=mc_embeddings, 
-                                           time_stamps=mc_time_stamps, 
-                                           vad_probs=mono_vad_probs,
-                                           scale_mapping=scale_mapping
-                                           )
-        for uniq_id, mc_embs in tqdm(mc_embeddings.items(), desc="Clustering Late-fusion multi-channel embeddings"):
-            # These clustering labels contain silence tokens -1, so we need to add 1 to the labels
-            # clus_labels[uniq_id] = stitch_cluster_labels(Y_old=(self.clus_labels_by_session[uniq_id].long()+1), Y_new=(torch.tensor(clus_labels[uniq_id]).long()+1))
-            # clus_labels[uniq_id] = clus_labels[uniq_id] - 1
-            mc_session_clus_labels[uniq_id] = clus_labels[uniq_id]
-
+        mc_session_clus_labels = self._run_clustering_session(is_multi_channel=True)
         return mc_embeddings, mc_time_stamps, mono_vad_probs, mc_session_clus_labels
-    
+
+    def _run_clustering_session(self, verbose=False, is_multi_channel=False):
+        """
+        Run clustering algorithm on embeddings and time stamps
+        """
+        uniq_clus_embs = {}
+        for uniq_id, audio_rttm_values in tqdm(self.AUDIO_RTTM_MAP.items(), desc='clustering', leave=True, disable=not verbose):
+            _embeddings = self._load_uniq_id_tensor(uniq_id, 'embeddings', multi_ch_mode=is_multi_channel)
+            _vad_probs = self._load_uniq_id_tensor(uniq_id, 'vad_probs', multi_ch_mode=False)
+            _time_stamps = self._load_uniq_id_tensor(uniq_id, 'time_stamps', multi_ch_mode=is_multi_channel)
+            scale_map = self.maxlen_scale_map.squeeze(0)[:, :_time_stamps.shape[1]]
+            ref_entry, hyp_entry, cluster_labels_infer = perform_clustering_session_embs(
+                uniq_id=uniq_id,
+                embeddings=_embeddings,
+                vad_probs=_vad_probs,
+                time_stamps=_time_stamps,
+                scale_map=scale_map,
+                audio_rttm_values=audio_rttm_values, 
+                out_rttm_dir=self._init_clus_diarizer(),
+                clustering_params=self._cluster_params,
+                multiscale_weights=self._diarizer_params.speaker_embeddings.parameters.multiscale_weights,
+                multiscale_dict=self.multiscale_args_dict['scale_dict'],
+                verbose=self.verbose,
+                vad_threshold=self._diarizer_params.vad.parameters.frame_vad_threshold,
+                device=self._diarizer_model.device,
+            )
+            uniq_clus_embs[uniq_id] = cluster_labels_infer
+            del _embeddings, _vad_probs, _time_stamps
+            torch.cuda.empty_cache()
+        return uniq_clus_embs
+
     def _run_clustering(self, embeddings, time_stamps, vad_probs, scale_mapping):
         """
         Run clustering algorithm on embeddings and time stamps
