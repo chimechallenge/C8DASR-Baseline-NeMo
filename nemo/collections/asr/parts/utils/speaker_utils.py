@@ -714,8 +714,7 @@ def perform_clustering_session_embs(
     get_rttm_with_the_finest_scale: bool = True,
     cuda: bool = True,
 ):
-    lines_cluster_labels, all_hypothesis, all_reference = [], [], []
-
+    lines_cluster_labels = [] 
     if len(embeddings.shape) > 3: # If multi-channel case
         time_stamps = time_stamps[:, :, :, 0]
     base_scale_idx = clustering_params.clustering_scale_index
@@ -940,7 +939,6 @@ def perform_clustering_embs(
         else:
             no_references = True
             all_reference = []
-
     return all_reference, all_hypothesis, uniq_clus_labels_dict
 
 def perform_clustering(
