@@ -76,7 +76,7 @@ CHiME-6, DiPCo and NOTSOFAR1 will be downloaded automatically.
 ## 📊 Results
 
 As explained in [official challenge website](https://www.chimechallenge.org/current/task1/index) this year
-systems will be ranked according to macro tcpWER [5] across the 4 scenarios (5 s collar). <br>
+systems will be ranked according to macro [tcpWER](https://arxiv.org/pdf/2307.11394.pdf) across the 4 scenarios (5 s collar). <br>
 
 ```
 ###############################################################################                                                                                                                                                         
