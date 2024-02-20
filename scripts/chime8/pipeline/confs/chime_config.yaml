@@ -169,7 +169,7 @@ gss:
   bss_iterations: 5
   context_duration: 15
   use_garbage_class: true
-  min_segment_length: 0.02
+  min_segment_length: 0.2
   max_segment_length: 30 # reduce if you encounter OOM (may raise WER however)
   max_batch_duration: 100 # not used right now
   max_batch_cuts: 1
@@ -262,14 +262,6 @@ asr:
 
 eval:
   dasr_root: ${chime_data_root}
-  hyp_folder: null
-  partition: dev
-  output_folder: null
-  # Whether or not use diarization to re-order the system output, if "set to false we will not re-order 
-  # the system output (you can set to false if you are using oracle diarization)
-  diarization: True 
-  falign: false  # Path to folder containing forced-alignment rttms. (not used now)
-  collar: 500  # Diarization metrics collar in ms. 500ms collar in pyannote is equivalent to 250ms start and end collar in dscore.
-  # If ignore_missing=True, it will ignore missing JSON for a particular scenario, in case you want to score e.g. only DiPCo. 
-  # If False, missing the corresponding JSON for a particular scenario will raise an error.
-  ignore_missing: True 
+  subsets: ${subsets}
+  scenarios: ${scenarios}
+  ignore_missing: True

@@ -9,7 +9,7 @@
   - pip install omegaconf
 
 - `ImportError: cannot import name 'ImitatesDict' from 'lhotse.lazy' (/home/popcornell/miniconda3/envs/c8dasr/lib/python3.10/site-packages/lhotse/lazy.py)`
-   - pip install lhotse==1.13.0
+   - pip install lhotse==1.21.0
 
 
 ## Environment Setup

@@ -16,7 +16,7 @@ import logging
 
 from local.asr.run_asr import run_asr
 from local.diar.run_diar import run_diarization
-from local.eval.run_chime_eval import run_chime_evaluation
+from local.eval.run_eval import run_evaluation
 from local.gss.run_gss_process import run_gss_process
 from omegaconf import DictConfig, OmegaConf
 
@@ -67,7 +67,7 @@ def main(cfg):
         run_asr(cfg)
 
     if run_stage_flag(4):
-        run_chime_evaluation(cfg)
+        run_evaluation(cfg)
 
 
 if __name__ == "__main__":

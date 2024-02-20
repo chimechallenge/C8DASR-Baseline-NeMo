@@ -135,11 +135,10 @@ def enhance_cuts(
 
     # Paranoia mode: ensure that cuts_per_recording have ids same as the recording_id
     cuts = CutSet.from_cuts(cut.with_id(cut.recording_id) for cut in cuts)
-
     logger.info("Aplying min/max segment length constraints")
-    cuts_per_segment = cuts_per_segment.filter(lambda c: c.duration > min_segment_length).cut_into_windows(
+    cuts_per_segment = cuts_per_segment.cut_into_windows(
         duration=max_segment_length
-    )
+    ).filter(lambda c: c.duration > min_segment_length)
 
     # ########################################
     # Initialize enhancer

@@ -693,11 +693,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
         self._validation_dl = self.__setup_dataloader_from_config(config=val_data_config,)
         return max_len_ms_ts, max_len_scale_map 
 
-    def setup_multiple_test_data(self):
-        """MSDD does not use multiple_test_data template. This function is a placeholder for preventing error.
-        """
-        return None
-
     def test_dataloader(self):
         if self._test_dl is not None:
             return self._test_dl

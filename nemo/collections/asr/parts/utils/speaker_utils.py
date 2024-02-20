@@ -714,9 +714,7 @@ def perform_clustering_session_embs(
     get_rttm_with_the_finest_scale: bool = True,
     cuda: bool = True,
 ):
-    lines_cluster_labels, all_hypothesis, all_reference = [], [], []
-    no_references = False
-
+    lines_cluster_labels = [] 
     if len(embeddings.shape) > 3: # If multi-channel case
         time_stamps = time_stamps[:, :, :, 0]
     base_scale_idx = clustering_params.clustering_scale_index
@@ -785,13 +783,13 @@ def perform_clustering_session_embs(
     else:
         gc.collect()
 
-    del ms_embs_scaled_vadmasked, ms_silsp_embs, selected_ss_mc_embs, ms_ts_scaled, vad_decision_scaled, vad_decision_base
     if get_rttm_with_the_finest_scale: 
         timestamps = time_stamps[-1][:max_scm][cluster_labels_infer != -1]/feat_per_sec
         cluster_labels = cluster_labels_infer[cluster_labels_infer != -1].cpu().numpy()
     else:
         timestamps = ms_ts_scaled[vad_decision_scaled, :] 
         cluster_labels = cluster_labels.cpu().numpy()
+    del ms_embs_scaled_vadmasked, ms_silsp_embs, selected_ss_mc_embs, ms_ts_scaled, vad_decision_scaled, vad_decision_base
     
     if len(cluster_labels) != timestamps.shape[0]:
         raise ValueError("Mismatch of length between cluster_labels and timestamps.")
@@ -802,12 +800,11 @@ def perform_clustering_session_embs(
     hypothesis = labels_to_pyannote_object(labels, uniq_name=uniq_id)
     hyp_entry = [uniq_id, hypothesis]
     rttm_file = audio_rttm_values.get('rttm_filepath', None)
-    if rttm_file is not None and os.path.exists(rttm_file) and not no_references:
+    if rttm_file is not None and os.path.exists(rttm_file):
         ref_labels = rttm_to_labels(rttm_file)
         reference = labels_to_pyannote_object(ref_labels, uniq_name=uniq_id)
         ref_entry = [uniq_id, reference]
     else:
-        no_references = True
         ref_entry = []
     return ref_entry, hyp_entry, cluster_labels_infer
 
@@ -942,7 +939,6 @@ def perform_clustering_embs(
         else:
             no_references = True
             all_reference = []
-
     return all_reference, all_hypothesis, uniq_clus_labels_dict
 
 def perform_clustering(
