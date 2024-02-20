@@ -18,7 +18,7 @@ import json
 from pathlib import Path
 import os
 
-from omegaconf import DictConfig, OmegaConf, open_dict
+from omegaconf import DictConfig, OmegaConf
 from chime_utils.scoring.meeteval import _wer
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
