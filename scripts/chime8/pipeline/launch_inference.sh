@@ -66,6 +66,13 @@ if [ ! -d "$CHIME_DATA_ROOT" ]; then
     exit
 fi
 
+
+if [ ! -d "$CHECKPOINTS" ]; then
+    echo "$CHECKPOINTS does not exists, downloading automatically the pre-trained models
+    from https://huggingface.co/chime-dasr/nemo_baseline_models"
+    git clone git@huggingface.co/chime-dasr/nemo_baseline_models $CHECKPOINTS
+fi
+
 python ${SCRIPT_NAME} --config-path="${CONFIG_PATH}" --config-name="$YAML_NAME" \
     diar_config=${DIAR_CONFIG} \
     stage=${STAGE} \

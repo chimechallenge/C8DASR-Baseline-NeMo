@@ -15,8 +15,9 @@
 - `git`, `pip`, and `bash` installed on your system.
 - CUDA 11.8 compatible hardware and drivers installed for `cupy-cuda11x` to work properly.
 - [Miniconda](https://docs.anaconda.com/free/miniconda/) or [Anaconda](https://www.anaconda.com/) installed.
-- libsndfile1 ffmpeg packages installed:
-  - `apt-get update && apt-get install -y libsndfile1 ffmpeg`
+- libsndfile1 ffmpeg packages installed (you can test by calling `ffmpeg` in the shell):
+  - via apt: `apt-get update && apt-get install -y libsndfile1 ffmpeg`
+  - or you can also use conda: `conda install ffmpeg -c conda-forge -y`
 
 
 ##  Installation
@@ -106,7 +107,7 @@ systems will be ranked according to macro [tcpWER](https://arxiv.org/pdf/2307.11
 
 If you want to perform inference with the pre-trained models. <br>
 We provide an end-to-end script for data generation and inference with the [pre-trained baseline NeMo models](https://huggingface.co/chime-dasr/nemo_baseline_models/tree/main): 
-`pipeline/launch_inference.sh`. <br>
+`pipeline/launch_inference.sh`. The models are downloaded automatically from [HuggingFace nemo baseline models repo](https://huggingface.co/chime-dasr/nemo_baseline_models/tree/main) <br>
 By default, the scripts hereafter will perform inference on dev set of all 4 scenarios: CHiME-6, DiPCo, Mixer 6 and NOTSOFAR1. <br>
 To limit e.g. only to CHiME-6 and DiPCo you can pass this option:
 
