@@ -125,7 +125,7 @@ You can also resume the inference at intermediate stages:
 If you have already generated the data via [chime-utils](https://github.com/chimechallenge/chime-utils) and the data is in `/path/to/chime8_dasr`:
 
 ```bash
-./run.sh --CHIME_DATA_ROOT /path/to/chime8_dasr --STAGE 1
+./launch_inference.sh --CHIME_DATA_ROOT /path/to/chime8_dasr --STAGE 1
 ```
 
 
@@ -135,14 +135,84 @@ Mixer 6 Speech has to be obtained via LDC and unpacked in a directory of your ch
 Data will be generated in `/your/path/to/chime8_dasr` again choose the most convenient location for you.
 
 ```bash
-./run.sh --CHIME_DATA_ROOT  /path/to/chime8_dasr \
+./launch_inference.sh --CHIME_DATA_ROOT  /path/to/chime8_dasr \
 --DOWNLOAD_ROOT /your/path/to/download \
 --MIXER6_ROOT /your/path/to/mixer6_root \
 --stage 0 
 ```
 
+### More details about the inference script 
+
+You can also set up these variables directly in the inference script in `pipeline/launch_inference.sh`. 
+
+```bash
+CHECKPOINTS=/path/to/checkpoints
+TEMP_DIR=/temp/path/to/chime8_baseline_tempdir
+CHIME_DATA_ROOT=/path/to/chime8_official_cleaned
+DOWNLOAD_ROOT=/raid/users/popcornell/chime8datasets # put your download folder here
+MIXER6_ROOT=/raid/users/popcornell/mixer6 # you have to put yours
+SCENARIOS="[mixer6,chime6,dipco,notsofar1]"
+STAGE=0
+STOP_STAGE=100
+```
+
+- `CHECKPOINTS` must point to the folder where you `git clone https://huggingface.co/chime-dasr/nemo_baseline_models`.
+- `TEMP_DIR` it is where the current experiment results will be stored.
+- `SCENARIOS` which scenarios you want to perform inference on ?  
+- `CHIME_DATA_ROOT` root folder of the generated CHiME-8 DASR data. If it does not exist and STAGE==0 it will be created. 
+- `DOWNLOAD_ROOT` where downloaded CHiME-8 DASR data will be stored. This applies only if you want to generate data at STAGE 0, if you have it already, you can skip it. 
+- `MIXER6_ROOT` root folder for the extracted Mixer 6 Speech dataset obtained via LDC (see [DASR data page](https://www.chimechallenge.org/current/task1/data)).
+- `STAGE` stage of the pipeline you want to start from. 
+- `STOP_STAGE` stage of the pipeline you want to stop, if `STAGE` == `STOP_STAGE` only one stage will be performed (e.g. for 1 you will only do diarization).
 
 
+For reference, the generated `CHIME_DATA_ROOT` should look like: 
+
+```
+.
+├── chime6
+│   ├── audio
+│   ├── devices
+│   ├── transcriptions
+│   ├── transcriptions_scoring
+│   └── uem
+├── dipco
+│   ├── audio
+│   ├── devices
+│   ├── transcriptions
+│   ├── transcriptions_scoring
+│   └── uem
+├── mixer6
+│   ├── audio
+│   ├── devices
+│   ├── transcriptions
+│   ├── transcriptions_scoring
+│   └── uem
+└── notsofar1
+    ├── audio
+    ├── devices
+    ├── transcriptions
+    ├── transcriptions_scoring
+    └── uem
+```
+
+While `MIXER6_ROOT` should look like: 
+
+
+```
+mixer6
+├── data 
+│   └── pcm_flac 
+├── metadata 
+│   ├── iv_components_final.csv 
+│   ├── mx6_calls.csv 
+...
+├── splits 
+│   ├── dev_a 
+│   ├── dev_a.list 
+...
+└── train_and_dev_files
+```
 
 
 
