@@ -56,11 +56,9 @@ def main(cfg):
         run_diarization(cfg)
 
     if run_stage_flag(2):
-        # Run GSS
         logging.info("Running GSS")
         run_gss_process(cfg)
 
-    # Run ASR
     if run_stage_flag(3):
         logging.info("Running ASR")
         run_asr(cfg)

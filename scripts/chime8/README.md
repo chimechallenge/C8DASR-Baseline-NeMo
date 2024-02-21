@@ -146,7 +146,7 @@ Data will be generated in `/your/path/to/chime8_dasr` again choose the most conv
 You can also set up these variables directly in the inference script in `pipeline/launch_inference.sh`. 
 
 ```bash
-CHECKPOINTS=/path/to/checkpoints
+CHECKPOINTS=/path/to/nemo_baseline_models
 TEMP_DIR=/temp/path/to/chime8_baseline_tempdir
 CHIME_DATA_ROOT=/path/to/chime8_official_cleaned
 DOWNLOAD_ROOT=/raid/users/popcornell/chime8datasets # put your download folder here
@@ -156,14 +156,14 @@ STAGE=0
 STOP_STAGE=100
 ```
 
-- `CHECKPOINTS` must point to the folder where you `git clone https://huggingface.co/chime-dasr/nemo_baseline_models`.
-- `TEMP_DIR` it is where the current experiment results will be stored.
-- `SCENARIOS` which scenarios you want to perform inference on ?  
-- `CHIME_DATA_ROOT` root folder of the generated CHiME-8 DASR data. If it does not exist and STAGE==0 it will be created. 
-- `DOWNLOAD_ROOT` where downloaded CHiME-8 DASR data will be stored. This applies only if you want to generate data at STAGE 0, if you have it already, you can skip it. 
-- `MIXER6_ROOT` root folder for the extracted Mixer 6 Speech dataset obtained via LDC (see [DASR data page](https://www.chimechallenge.org/current/task1/data)).
-- `STAGE` stage of the pipeline you want to start from. 
-- `STOP_STAGE` stage of the pipeline you want to stop, if `STAGE` == `STOP_STAGE` only one stage will be performed (e.g. for 1 you will only do diarization).
+- `CHECKPOINTS` Points to the directory `nemo_baseline_models`, where you clone the model repository with `git clone https://huggingface.co/chime-dasr/nemo_baseline_models`.
+- `TEMP_DIR` Designated as a space for storing the intermediate processing data (embeddings, manifest files, audio files, etc.).
+- `SCENARIOS` Specifies scenario you want to perform inference on in list format.
+- `CHIME_DATA_ROOT` Refers to the root directory of the generated CHiME-8 DASR data. If it does not exist and STAGE==0, the directory will be created. 
+- `DOWNLOAD_ROOT` The location where downloaded CHiME-8 DASR data will be stored. This applies only if you want to generate data at STAGE 0, if you have it already, you can skip it. 
+- `MIXER6_ROOT` Points to the root folder for the extracted Mixer 6 Speech dataset obtained via LDC (see [DASR data page](https://www.chimechallenge.org/current/task1/data)).
+- `STAGE` Defines the stage of the pipeline you want to start from:(1: Diarization, 2: GSS, 3: ASR, 4: Evaluation)
+- `STOP_STAGE` Defines the stage of the pipeline you want to stop. If `STAGE` == `STOP_STAGE` only one stage will be performed (e.g. for 1 you will only do diarization).
 
 
 For reference, the generated `CHIME_DATA_ROOT` should look like: 
