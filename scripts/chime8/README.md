@@ -39,6 +39,7 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvi
 
 Install locally NeMo using this repository:
 ```bash
+conda activate c8dasr
 cd C8DASR-Baseline-NeMo
 pip install Cython
 ./reinstall.sh
@@ -135,7 +136,8 @@ Mixer 6 Speech has to be obtained via LDC and unpacked in a directory of your ch
 Data will be generated in `/your/path/to/chime8_dasr` again choose the most convenient location for you.
 
 ```bash
-./launch_inference.sh --CHIME_DATA_ROOT  /path/to/chime8_dasr \
+./launch_inference.sh \ 
+--CHIME_DATA_ROOT  /path/to/chime8_dasr \
 --DOWNLOAD_ROOT /your/path/to/download \
 --MIXER6_ROOT /your/path/to/mixer6_root \
 --stage 0 
