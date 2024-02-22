@@ -42,6 +42,7 @@ def run_stage(stage_num, start_stage=-1, stop_stage=np.inf, skip_stages=None):
 
 @hydra_runner(config_path="../", config_name="chime_config")
 def main(cfg):
+    cfg = DictConfig(OmegaConf.to_container(cfg, resolve=True))
 
     run_stage_flag = partial(
         run_stage,
@@ -50,18 +51,14 @@ def main(cfg):
         skip_stages=cfg.skip_stages,
     )
 
-    cfg = DictConfig(OmegaConf.to_container(cfg, resolve=True))
-
     if run_stage_flag(1):
         logging.info("Running Diarization")
         run_diarization(cfg)
 
     if run_stage_flag(2):
-        # Run GSS
         logging.info("Running GSS")
         run_gss_process(cfg)
 
-    # Run ASR
     if run_stage_flag(3):
         logging.info("Running ASR")
         run_asr(cfg)
