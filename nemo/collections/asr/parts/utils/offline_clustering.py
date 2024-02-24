@@ -564,7 +564,7 @@ def get_chunked_argmin_mat(
         csa = curr_scale_anchor[offset_cur:(offset_cur+window_cur)]
         bsa = base_scale_anchor[(idx * hop_len):(idx * hop_len)+window]
         argmin_local = calculate_argmin_matrix(tgt_anchor=csa, ref_anchor=bsa)
-        if argmin_local.shape[0] <= window:
+        if argmin_local.shape[0] < window:
             # If the current scale is shorter than the window, we just add the remaining to the last chunk and finish
             idx = -1
         if idx == 0:
