@@ -284,7 +284,6 @@ def parse_rttm_for_ms_targets(
     Generate target tensor variable by extracting groundtruth diarization labels from an RTTM file.
     """
     rttm_lines = open(rttm_file).readlines()
-    # uniq_id = get_uniq_id_with_range(sample)
     rttm_timestamps, sess_to_global_spkids = extract_seg_info_from_rttm(uniq_id, offset, duration, rttm_lines)
     fr_level_target = get_frame_targets_from_rttm(rttm_timestamps=rttm_timestamps, 
                                                     offset=offset,
@@ -440,7 +439,6 @@ class _AudioMSDDTrainDataset(Dataset):
         self.global_speaker_label_table = get_speaker_labels_from_diar_rttms(self.collection)
         self.ch_clus_mat_dict = {}
         self.channel_cluster_dict = {}
-        # self.use_1ch_from_ch_clus = True
         self.use_1ch_from_ch_clus = False
     
     def __len__(self):
@@ -1046,12 +1044,8 @@ def _msdd_infer_collate_fn(self, batch):
 
     for feature, ms_seg_ts, lbl_len, label, target in batch:
         flen_list.append(lbl_len)
-        # ms_avg_embs_list.append(ivector)
-        # if feature.shape[0] < max_seq_len:
         pad_lbl = (0, max_target_len - label.shape[0])
         if len(feature.shape) == 4: # Multichannel late-fusion mode
-            # pad_feat = (0, 0, 0, 0, 0, 0, 0, max_seq_len - feature.shape[0])
-            # pad_lbl = (0, 0, 0, max_target_len - label.shape[0])
             pad_feat = (0, max_clus_ch - feature.shape[3], 0, 0, 0, 0, 0, max_seq_len - feature.shape[0])
         elif len(feature.shape) == 3:
             pad_feat = (0, 0, 0, 0, 0, max_seq_len - feature.shape[0])

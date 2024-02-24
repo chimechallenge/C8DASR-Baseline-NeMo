@@ -474,7 +474,6 @@ class EncDecDiarLabelModel(ModelPT, ExportableEncDecModel):
             global_rank = self._trainer.global_rank
         else:
             global_rank = 0
-
         dataset = AudioToSpeechMSDDTrainDataset(
             manifest_filepath=config.manifest_filepath,
             emb_dir=config.emb_dir,

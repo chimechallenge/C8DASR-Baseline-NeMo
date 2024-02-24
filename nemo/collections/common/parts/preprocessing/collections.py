@@ -22,7 +22,7 @@ import pandas as pd
 
 from nemo.collections.common.parts.preprocessing import manifest, parsers
 from nemo.utils import logging
-
+from tqdm import tqdm
 
 class _Collection(collections.UserList):
     """List of parsed and preprocessed data."""
@@ -826,8 +826,8 @@ class DiarizationSpeechLabel(DiarizationLabel):
             [],
             [],
         )
-
-        for item in manifest.item_iter(manifests_files, parse_func=self.__parse_item_rttm):
+        rttm_buffer_dict = {}
+        for item in tqdm(manifest.item_iter(manifests_files, parse_func=self.__parse_item_rttm)):
             if uniq_id is not None and item['uniq_id'] != uniq_id:
                 continue
             # Inference mode
@@ -840,19 +840,24 @@ class DiarizationSpeechLabel(DiarizationLabel):
             # Training mode
             else:
                 rttm_labels = []
-                with open(item['rttm_file'], 'r') as f:
-                    for index, line in enumerate(f.readlines()):
-                        start, end, speaker = self.split_rttm_line(line, decimals=3)
-                        rttm_labels.append('{} {} {}'.format(start, end, speaker))
-                speaker_set = set()
-                for rttm_line in rttm_labels:
-                    spk_str = rttm_line.split()[-1]
-                    speaker_set.add(spk_str)
-                speaker_list = sorted(list(speaker_set))
-                sess_spk_dict = {key: val for key, val in enumerate(speaker_list)}
-                target_spks = tuple(sess_spk_dict.keys())
-                clus_speaker_digits = target_spks
-                rttm_speaker_digits = target_spks
+                rttm_file_path = item['rttm_file']
+
+                if rttm_file_path in rttm_buffer_dict:
+                    speaker_list, sess_spk_dict, target_spks, clus_speaker_digits, rttm_speaker_digits = rttm_buffer_dict[rttm_file_path]
+                else:
+                    with open(rttm_file_path, 'r') as f:
+                        for index, line in enumerate(f.readlines()):
+                            start, end, speaker = self.split_rttm_line(line, decimals=3)
+                            rttm_labels.append('{} {} {}'.format(start, end, speaker))
+                    speaker_set = set()
+                    for rttm_line in rttm_labels:
+                        spk_str = rttm_line.split()[-1]
+                        speaker_set.add(spk_str)
+                    speaker_list = sorted(list(speaker_set))
+                    sess_spk_dict = {key: val for key, val in enumerate(speaker_list)}
+                    target_spks = tuple(sess_spk_dict.keys())
+                    clus_speaker_digits, rttm_speaker_digits = target_spks, target_spks
+                    rttm_buffer_dict[rttm_file_path] = (speaker_list, sess_spk_dict, target_spks, clus_speaker_digits, rttm_speaker_digits)
 
             audio_files.append(item['audio_file'])
             uniq_ids.append(item['uniq_id'])

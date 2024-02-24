@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 import shutil
 from typing import List, Union
@@ -239,12 +238,10 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
             mc_ms_emb_seq = torch.stack(embs_ch_list, dim=0).permute(0, 2, 3, 4, 1)
             mc_ms_ts_rep = torch.stack(ts_ch_list, dim=0).permute(0, 2, 3, 4, 1)
             mc_scale_mapping = torch.stack(mapping_ch_list, dim=0).permute(0, 2, 3, 1)
-            # mc_ms_vad_probs = torch.stack(vad_probs_ch_list, dim=0).permute(0, 2, 3, 4, 1)
             
             all_embs_list.append(mc_ms_emb_seq.detach().cpu())
             all_ts_list.append(mc_ms_ts_rep.detach().cpu())
             all_mapping_list.append(mc_scale_mapping.detach().cpu())
-            # all_vad_probs_list.append(mc_ms_vad_probs.detach().cpu())
             all_vad_probs_list.append(None)
             
             del val_batch
@@ -580,7 +577,7 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
             embeddings, time_stamps, vad_probs = self._forward_speaker_encoder(manifest_file=self._diarizer_params.manifest_filepath,
                                                                                batch_size=batch_size)
         scale_mapping = {}
-        for uniq_id in tqdm(time_stamps.keys(), desc="Calculating scale mapping"):
+        for uniq_id in time_stamps.keys():
             scale_mapping[uniq_id] = self.maxlen_scale_map.squeeze(0)[:, :time_stamps[uniq_id].shape[1]]
         
         if mc_input: # If multichannel, we only use multichannel VAD results and skip clustering
@@ -604,14 +601,13 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
             clus_label_index (dict): dictionary containing uniq_id as key and list of cluster labels as value
         """
         self.maxlen_time_stamps, self.maxlen_scale_map = self._setup_diarizer_validation_data(manifest_file=self._diarizer_params.manifest_filepath)
-        embedding_hash, dataset_hash = self.get_hash_from_settings()     
         if self._check_extracted_tensors_exist(is_multi_channel=True):
             mc_embeddings, mc_time_stamps = {}, {}
         else:
             mc_embeddings, mc_time_stamps = self._forward_speaker_encoder_multi_channel(manifest_file=self._diarizer_params.manifest_filepath,
                                                                                             batch_size=batch_size)
         scale_mapping = {} 
-        for uniq_id, _ in tqdm(mc_time_stamps.items(), desc="Calculating scale mapping"):
+        for uniq_id in mc_time_stamps.keys():
             scale_mapping[uniq_id] = self.maxlen_scale_map.squeeze(0)[:, :mc_time_stamps[uniq_id].shape[1]]
         mc_session_clus_labels = {}
         mono_vad_probs = self._diarizer_model.mono_vad_probs
@@ -624,6 +620,7 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
         """
         uniq_clus_embs = {}
         for uniq_id, audio_rttm_values in tqdm(self.AUDIO_RTTM_MAP.items(), desc='clustering', leave=True, disable=not verbose):
+            logging.info(f"Loding existing embeddings for [{uniq_id}]")
             _embeddings = self._load_uniq_id_tensor(uniq_id, 'embeddings', multi_ch_mode=is_multi_channel)
             _vad_probs = self._load_uniq_id_tensor(uniq_id, 'vad_probs', multi_ch_mode=False)
             _time_stamps = self._load_uniq_id_tensor(uniq_id, 'time_stamps', multi_ch_mode=is_multi_channel)
