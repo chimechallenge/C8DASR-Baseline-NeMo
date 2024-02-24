@@ -1670,7 +1670,6 @@ class SpeakerClustering(torch.nn.Module):
         use_drop_and_recluster: bool = True,
     ) -> torch.LongTensor:
 
-        # embs = ms_embs.mean(dim=1)
         embs = embs.cuda()
         if len(embs.shape) == 3: # Multi-channel embeddings
             embs = embs.reshape(embs.shape[0], -1)

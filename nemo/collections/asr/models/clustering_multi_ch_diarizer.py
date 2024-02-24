@@ -239,12 +239,10 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
             mc_ms_emb_seq = torch.stack(embs_ch_list, dim=0).permute(0, 2, 3, 4, 1)
             mc_ms_ts_rep = torch.stack(ts_ch_list, dim=0).permute(0, 2, 3, 4, 1)
             mc_scale_mapping = torch.stack(mapping_ch_list, dim=0).permute(0, 2, 3, 1)
-            # mc_ms_vad_probs = torch.stack(vad_probs_ch_list, dim=0).permute(0, 2, 3, 4, 1)
             
             all_embs_list.append(mc_ms_emb_seq.detach().cpu())
             all_ts_list.append(mc_ms_ts_rep.detach().cpu())
             all_mapping_list.append(mc_scale_mapping.detach().cpu())
-            # all_vad_probs_list.append(mc_ms_vad_probs.detach().cpu())
             all_vad_probs_list.append(None)
             
             del val_batch
