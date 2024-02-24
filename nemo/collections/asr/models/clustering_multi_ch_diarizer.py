@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 import shutil
 from typing import List, Union
@@ -578,7 +577,7 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
             embeddings, time_stamps, vad_probs = self._forward_speaker_encoder(manifest_file=self._diarizer_params.manifest_filepath,
                                                                                batch_size=batch_size)
         scale_mapping = {}
-        for uniq_id in tqdm(time_stamps.keys(), desc="Calculating scale mapping"):
+        for uniq_id in time_stamps.keys():
             scale_mapping[uniq_id] = self.maxlen_scale_map.squeeze(0)[:, :time_stamps[uniq_id].shape[1]]
         
         if mc_input: # If multichannel, we only use multichannel VAD results and skip clustering
@@ -608,7 +607,7 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
             mc_embeddings, mc_time_stamps = self._forward_speaker_encoder_multi_channel(manifest_file=self._diarizer_params.manifest_filepath,
                                                                                             batch_size=batch_size)
         scale_mapping = {} 
-        for uniq_id, _ in tqdm(mc_time_stamps.items(), desc="Calculating scale mapping"):
+        for uniq_id in mc_time_stamps.keys():
             scale_mapping[uniq_id] = self.maxlen_scale_map.squeeze(0)[:, :mc_time_stamps[uniq_id].shape[1]]
         mc_session_clus_labels = {}
         mono_vad_probs = self._diarizer_model.mono_vad_probs
@@ -621,6 +620,7 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
         """
         uniq_clus_embs = {}
         for uniq_id, audio_rttm_values in tqdm(self.AUDIO_RTTM_MAP.items(), desc='clustering', leave=True, disable=not verbose):
+            logging.info(f"Loding existing embeddings for [{uniq_id}]")
             _embeddings = self._load_uniq_id_tensor(uniq_id, 'embeddings', multi_ch_mode=is_multi_channel)
             _vad_probs = self._load_uniq_id_tensor(uniq_id, 'vad_probs', multi_ch_mode=False)
             _time_stamps = self._load_uniq_id_tensor(uniq_id, 'time_stamps', multi_ch_mode=is_multi_channel)
