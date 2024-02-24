@@ -604,7 +604,6 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
             clus_label_index (dict): dictionary containing uniq_id as key and list of cluster labels as value
         """
         self.maxlen_time_stamps, self.maxlen_scale_map = self._setup_diarizer_validation_data(manifest_file=self._diarizer_params.manifest_filepath)
-        embedding_hash, dataset_hash = self.get_hash_from_settings()     
         if self._check_extracted_tensors_exist(is_multi_channel=True):
             mc_embeddings, mc_time_stamps = {}, {}
         else:

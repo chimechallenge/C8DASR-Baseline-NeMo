@@ -160,10 +160,20 @@ def drop_and_recluster(
             spk_aff_org_flat = cos_similarity(emb_a=stacked, emb_b=stacked).fill_diagonal_(0).flatten()
             sorted_aff, _ = spk_aff_org_flat[spk_aff_org_flat > 0.0].flatten().sort()
             min_aff, max_aff = sorted_aff[0].item(), sorted_aff[-1].item()
-            logging.info(f"[Speaker Counting] [min, max] affinity [{min_aff:.3f},{max_aff:.3f}],\n[Speaker Counting] reclus_aff_thres: {reclus_aff_thres:.3f}\n[Speaker Counting] running_num_of_spks: {torch.max(Y)+1}")
-            running_num_of_spks -= 1
-        n_clusters = Y.cpu().numpy().max() + 1
-        logging.info(f"[Speaker Counting] Final n_clusters: {n_clusters}")
+            if max_aff >= reclus_aff_thres: 
+                logging.info(f"[Speaker Counting Down] Above Thres. [min, max] affinity [{min_aff:.3f},{max_aff:.3f}], reclus_aff_thres: {reclus_aff_thres:.3f}, running_num_of_spks: {torch.max(Y)+1}")
+                running_num_of_spks -= 1
+            else:
+                logging.info(f"[Speaker Counting Up  ] Below Thres. [min, max] affinity [{min_aff:.3f},{max_aff:.3f}], reclus_aff_thres: {reclus_aff_thres:.3f}, running_num_of_spks: {torch.max(Y)+1}")
+                if running_num_of_spks < max_num_speakers:
+                    running_num_of_spks += 1
+                break
+    spectral_model = SpectralClustering(
+        n_clusters=running_num_of_spks, n_random_trials=n_random_trials, cuda=cuda, device=embs.device
+    )
+    Y = spectral_model.forward(affinity_mat)
+    n_clusters = Y.cpu().numpy().max() + 1
+    logging.info(f"[Speaker Counting] Final n_clusters: {n_clusters}")
     return Y, n_clusters
 
 def ScalerMinMax(X: torch.Tensor) -> torch.Tensor:
@@ -543,24 +553,26 @@ def get_chunked_argmin_mat(
     Get the argmin matrix for the current scale by chunking the matrix.
     
     """
-    hop_len = window - 2*ovl_len
+    hop_len = window - 2 * ovl_len
     curr_scale_in_cs = get_scale_in_centi_sec(timestamps_in_scales)
     ratio = round(curr_scale_in_cs/base_scale_in_cs, 2)
-    # total_chunks = torch.ceil(torch.tensor(1 + (base_len - window - ovl_len)/hop_len)).int().item()
     total_chunks = torch.ceil(torch.tensor(1 + (base_len - hop_len - ovl_len)/hop_len)).int().item()
     argmin_mat_list = []
     # Due to memory constraints, we need to chunk the matrix
     for idx in range(total_chunks):
-        offset = idx * hop_len
-        offset_cur = idx * int(hop_len/ratio)
-        window_cur = int(window/ratio)
+        offset_cur, window_cur = idx * int(hop_len/ratio), int(window/ratio)
         csa = curr_scale_anchor[offset_cur:(offset_cur+window_cur)]
-        bsa = base_scale_anchor[offset:offset+window]
+        bsa = base_scale_anchor[(idx * hop_len):(idx * hop_len)+window]
         argmin_local = calculate_argmin_matrix(tgt_anchor=csa, ref_anchor=bsa)
+        if argmin_local.shape[0] <= window:
+            # If the current scale is shorter than the window, we just add the remaining to the last chunk and finish
+            idx = -1
         if idx == 0:
             argmin_mat_list.append(argmin_local[:-ovl_len])
-        elif idx == total_chunks - 1:
+        elif idx == total_chunks - 1 or idx == -1:
             argmin_mat_list.append(argmin_local[ovl_len:] + offset_cur)
+            if idx == -1:
+                break
         else:
             argmin_mat_list.append(argmin_local[ovl_len:-ovl_len] + offset_cur)
     argmin_mat = torch.cat(argmin_mat_list, dim=0)
@@ -570,6 +582,7 @@ def get_chunked_argmin_mat(
     
 
 def get_argmin_mat_large(timestamps_in_scales: List[torch.Tensor], window=20000, hop_len=16000) -> List[torch.Tensor]:
+# def get_argmin_mat_large(timestamps_in_scales: List[torch.Tensor], window=400000, hop_len=16000) -> List[torch.Tensor]:
     """
     Calculate the mapping between the base scale and other scales. A segment from a longer scale is
     repeatedly mapped to a segment from a shorter scale or the base scale.
@@ -592,18 +605,20 @@ def get_argmin_mat_large(timestamps_in_scales: List[torch.Tensor], window=20000,
         curr_scale_anchor = mean_interval[mean_interval != 0]
         if scale_idx == max(scale_list): # base scale
             base_scale_anchor = curr_scale_anchor
-        curr_len, base_len = curr_scale_anchor.shape[0], base_scale_anchor.shape[0]
-        if curr_len > window:
-            # If the current scale is longer than the window, we chunk the matrix
-            argmin_mat = get_chunked_argmin_mat(base_scale_in_cs, 
-                                                curr_scale_anchor,
-                                                base_scale_anchor,
-                                                timestamps_in_scales[scale_idx], 
-                                                base_len, 
-                                                window, 
-                                                ovl_len)
+            argmin_mat = torch.arange(base_scale_anchor.shape[0])
         else:
-            argmin_mat = calculate_argmin_matrix(curr_scale_anchor, base_scale_anchor)
+            curr_len, base_len = curr_scale_anchor.shape[0], base_scale_anchor.shape[0]
+            if curr_len > window:
+                # If the current scale is longer than the window, we chunk the matrix
+                argmin_mat = get_chunked_argmin_mat(base_scale_in_cs, 
+                                                    curr_scale_anchor,
+                                                    base_scale_anchor,
+                                                    timestamps_in_scales[scale_idx], 
+                                                    base_len, 
+                                                    window, 
+                                                    ovl_len)
+            else:
+                argmin_mat = calculate_argmin_matrix(curr_scale_anchor, base_scale_anchor)
         session_scale_mapping_list.append(argmin_mat)
     session_scale_mapping_list.reverse()
     return session_scale_mapping_list
@@ -782,7 +797,6 @@ def eigDecompose(laplacian: torch.Tensor, cuda: bool, device: torch.device) -> T
     else:
         laplacian = laplacian.float().to(torch.device('cpu'))
     lambdas, diffusion_map = eigh(laplacian.double())
-    # lambdas, diffusion_map = eigh(laplacian)
     return lambdas.float(), diffusion_map.float()
 
 
@@ -1269,7 +1283,6 @@ class NMESC:
 
         p_hat_value = (subsample_ratio * rp_p_value).type(torch.int)
         if self.maj_vote_spk_count:
-            # est_num_of_spk = torch.mode(torch.tensor(est_num_of_spk_list))[0]
             est_num_of_spk = torch.mode(est_num_of_spk_list)[0]
         else:
             est_num_of_spk = est_spk_n_dict[rp_p_value.item()]

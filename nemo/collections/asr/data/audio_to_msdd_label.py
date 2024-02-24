@@ -440,7 +440,6 @@ class _AudioMSDDTrainDataset(Dataset):
         self.global_speaker_label_table = get_speaker_labels_from_diar_rttms(self.collection)
         self.ch_clus_mat_dict = {}
         self.channel_cluster_dict = {}
-        # self.use_1ch_from_ch_clus = True
         self.use_1ch_from_ch_clus = False
     
     def __len__(self):
