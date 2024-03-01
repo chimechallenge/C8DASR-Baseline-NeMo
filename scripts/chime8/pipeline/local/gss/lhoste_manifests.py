@@ -193,7 +193,6 @@ def prepare_chime6(
             sources = []
             for idx, audio_path in enumerate(sorted(audio_paths)):
                 sources.append(AudioSource(type="file", channels=[idx], source=str(audio_path)))
-
             audio_sf = sf.SoundFile(str(audio_paths[0]))
             recordings.append(
                 Recording(

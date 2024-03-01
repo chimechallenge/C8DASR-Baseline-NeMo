@@ -35,14 +35,14 @@ def sample_params(cfg: DictConfig, trial: optuna.Trial):
 
     # Diarization Optimization
     cfg.diarizer.oracle_vad = False
-    cfg.diarizer.vad.parameters.frame_vad_threshold = trial.suggest_float("frame_vad_threshold", 0.15, 0.7, step=0.02)
+    cfg.diarizer.vad.parameters.frame_vad_threshold = trial.suggest_float("frame_vad_threshold", 0.1, 0.7, step=0.01)
     cfg.diarizer.vad.parameters.pad_onset = round(trial.suggest_float("pad_onset", 0.0, 0.2, step=0.01), 2)
     cfg.diarizer.vad.parameters.pad_offset = round(trial.suggest_float("pad_offset", 0.0, 0.2, step=0.01), 2)
     cfg.diarizer.vad.parameters.min_duration_on = round(trial.suggest_float("min_duration_on", 0.2, 0.4, step=0.05), 2)
     cfg.diarizer.vad.parameters.min_duration_off = round(
         trial.suggest_float("min_duration_off", 0.5, 0.95, step=0.05), 2
     )
-    cfg.diarizer.msdd_model.parameters.sigmoid_threshold = [0.55]
+    cfg.diarizer.msdd_model.parameters.sigmoid_threshold = [trial.suggest_float("sigmoid_threshold", 0.1, 0.9, step=0.05)]
     cfg.diarizer.msdd_model.parameters.global_average_mix_ratio = trial.suggest_float(
         "global_average_mix_ratio", low=0.1, high=0.95, step=0.05
     )
@@ -52,18 +52,17 @@ def sample_params(cfg: DictConfig, trial: optuna.Trial):
 
     cfg.diarizer.clustering.parameters.oracle_num_speakers = False
     cfg.diarizer.clustering.parameters.max_rp_threshold = round(
-        trial.suggest_float("max_rp_threshold", low=0.03, high=0.1, step=0.01), 2
+        trial.suggest_float("max_rp_threshold", low=0.03, high=0.5, step=0.01), 2
     )
     cfg.diarizer.clustering.parameters.sparse_search_volume = trial.suggest_int(
-        "sparse_search_volume", low=10, high=25, step=1
+        "sparse_search_volume", low=5, high=50, step=1
     )
     cfg.diarizer.clustering.parameters.sync_score_thres = trial.suggest_float("sync_score_thres", 0.4, 0.95, step=0.02)
     cfg.diarizer.clustering.reclus_aff_thres = trial.suggest_float("reclus_aff_thres", low=0.6, high=0.9, step=0.01)
 
-    r_value = round(trial.suggest_float("r_value", 0.5, 2.5, step=0.05), 4)
+    r_value = round(trial.suggest_float("r_value", 0.1, 3.0, step=0.05), 4)
     scale_n = len(cfg.diarizer.speaker_embeddings.parameters.multiscale_weights)
     cfg.diarizer.speaker_embeddings.parameters.multiscale_weights = scale_weights(r_value, scale_n)
-
     return cfg
 
 

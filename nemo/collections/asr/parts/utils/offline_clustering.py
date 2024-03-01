@@ -551,7 +551,6 @@ def get_chunked_argmin_mat(
     ) -> List[torch.Tensor]:
     """ 
     Get the argmin matrix for the current scale by chunking the matrix.
-    
     """
     hop_len = window - 2 * ovl_len
     curr_scale_in_cs = get_scale_in_centi_sec(timestamps_in_scales)
