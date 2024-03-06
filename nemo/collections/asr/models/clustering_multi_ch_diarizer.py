@@ -442,13 +442,13 @@ class ClusteringMultiChDiarizer(ClusteringDiarizer):
                         self.time_stamps[uniq_id].append(ts_add)
                         if not is_multi_channel:
                             self.vad_probs[uniq_id].append(vadp_add)
-                            
-                        if last_window_flag:
-                            self._save_extracted_data(uniq_id, is_multi_channel, save_embs=save_embs)
                     else:
                         # Assign the actual length of the last segment to the truncated segment
                         logging.info(f"Truncated - batch_idx: {batch_idx} sample_id {sample_id} ts_add.shape {ts_add.shape} Truncating last segment of uniq_id: {uniq_id}")
                         self._diarizer_model.uniq_id_segment_counts[uniq_id] = self.uniq_id_segment_counts[uniq_id]
+
+                    if last_window_flag:
+                            self._save_extracted_data(uniq_id, is_multi_channel, save_embs=save_embs)
                 else:
                     self.uniq_id_segment_counts[uniq_id] = 1
                     self.embeddings[uniq_id] = [embs[sample_id][:-(ovl), :, :]]

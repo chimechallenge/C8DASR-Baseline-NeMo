@@ -88,27 +88,14 @@ def prepare_nemo_manifests(data_dir: str, audio_type: str = 'flac'):
     Prepare NeMo manifests from GSS outputs
     """
     # Make sure we know scenario
-    if 'chime6' in data_dir:
-        scenario = 'chime6'
-    elif 'dipco' in data_dir:
-        scenario = 'dipco'
-    elif 'mixer6' in data_dir:
-        scenario = 'mixer6'
-    elif 'notsofar1' in data_dir:
-        scenario = 'notsofar1'
-    else:
-        raise ValueError(f'Unknown setup: {data_dir}')
+    parts = data_dir.split('/')
+    scenario = parts[-2]
+    subset = parts[-1]
 
-    # Make sure we know subset
-    if 'dev' in data_dir and 'eval' in data_dir:
-        raise ValueError(f'Unknown subset: both dev and eval are in {data_dir}')
-    elif 'dev' in data_dir:
-        subset = 'dev'
-    elif 'train' in data_dir:
-        subset = 'train'
-    elif 'eval' in data_dir:
-        subset = 'eval'
-    else:
+    if scenario not in ['chime6', 'dipco', 'mixer6', 'notsofar1']:
+        raise ValueError(f'Unknown scenario: {data_dir}')
+
+    if subset not in ['dev', 'eval', 'train']:
         raise ValueError(f'Unknown subset: {data_dir}')
 
     # Find all audio files
